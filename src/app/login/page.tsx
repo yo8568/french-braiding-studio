@@ -8,17 +8,22 @@ import { INPUT_CLASS } from "@/lib/constants";
 export default function LoginPage() {
   const { login } = useAuth();
   const router = useRouter();
-  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
-    if (login(username, password)) {
-      router.push("/");
-    } else {
+    setSubmitting(true);
+
+    const err = await login(email, password);
+    if (err) {
       setError("帳號或密碼錯誤");
+      setSubmitting(false);
+    } else {
+      router.push("/");
     }
   }
 
@@ -32,12 +37,13 @@ export default function LoginPage() {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium mb-1">帳號</label>
+            <label className="block text-sm font-medium mb-1">Email</label>
             <input
+              type="email"
               className={INPUT_CLASS}
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              placeholder="帳號"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="your@email.com"
               autoFocus
             />
           </div>
@@ -54,9 +60,10 @@ export default function LoginPage() {
           {error && <p className="text-sm text-red-500">{error}</p>}
           <button
             type="submit"
-            className="w-full bg-primary text-white py-2.5 rounded-lg font-semibold hover:bg-accent transition-colors"
+            disabled={submitting}
+            className="w-full bg-primary text-white py-2.5 rounded-lg font-semibold hover:bg-accent transition-colors disabled:opacity-50"
           >
-            登入
+            {submitting ? "登入中..." : "登入"}
           </button>
         </form>
       </div>
