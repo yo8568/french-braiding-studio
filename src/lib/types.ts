@@ -11,6 +11,15 @@ export interface Client {
   created_at: string;
 }
 
+export interface ClientNote {
+  id: string;
+  client_id: string;
+  type: "feedback" | "inquiry" | "communication" | "other";
+  content: string;
+  image_urls: string[];
+  created_at: string;
+}
+
 export interface Work {
   id: string;
   client_id: string;

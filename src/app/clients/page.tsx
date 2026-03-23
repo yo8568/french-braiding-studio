@@ -2,16 +2,18 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase";
-import type { Client, Work } from "@/lib/types";
+import type { Client, ClientNote, Work } from "@/lib/types";
 
 export default function ClientsPage() {
   const supabase = createClient();
   const [clients, setClients] = useState<Client[]>([]);
   const [clientWorks, setClientWorks] = useState<Record<string, Work[]>>({});
+  const [clientNotes, setClientNotes] = useState<Record<string, ClientNote[]>>({});
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [noteForm, setNoteForm] = useState<{ clientId: string; type: ClientNote["type"]; content: string; images: File[] } | null>(null);
   const [form, setForm] = useState({
     name: "",
     phone: "",
@@ -52,7 +54,54 @@ export default function ClientsPage() {
       setClientWorks(grouped);
     }
 
+    // Load notes for all clients
+    if (clientList.length > 0) {
+      const ids = clientList.map((c) => c.id);
+      const { data: notes } = await supabase
+        .from("client_notes")
+        .select("*")
+        .in("client_id", ids)
+        .order("created_at", { ascending: false });
+
+      const groupedNotes: Record<string, ClientNote[]> = {};
+      for (const n of (notes as ClientNote[]) ?? []) {
+        if (!groupedNotes[n.client_id]) groupedNotes[n.client_id] = [];
+        groupedNotes[n.client_id].push(n);
+      }
+      setClientNotes(groupedNotes);
+    }
+
     setLoading(false);
+  }
+
+  async function handleAddNote() {
+    if (!noteForm || !noteForm.content.trim()) return;
+
+    // Upload images
+    const imageUrls: string[] = [];
+    for (const file of noteForm.images) {
+      const ext = file.name.split(".").pop();
+      const path = `notes/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+      const { error } = await supabase.storage.from("work-images").upload(path, file);
+      if (!error) {
+        const { data: { publicUrl } } = supabase.storage.from("work-images").getPublicUrl(path);
+        imageUrls.push(publicUrl);
+      }
+    }
+
+    await supabase.from("client_notes").insert({
+      client_id: noteForm.clientId,
+      type: noteForm.type,
+      content: noteForm.content.trim(),
+      image_urls: imageUrls,
+    });
+    setNoteForm(null);
+    loadClients();
+  }
+
+  async function handleDeleteNote(noteId: string) {
+    await supabase.from("client_notes").delete().eq("id", noteId);
+    loadClients();
   }
 
   function resetForm() {
@@ -119,6 +168,13 @@ export default function ClientsPage() {
   const shippingLabels: Record<string, string> = {
     delivery: "宅配",
     convenience_store: "超商取貨",
+  };
+
+  const noteTypeLabels: Record<string, string> = {
+    feedback: "回饋",
+    inquiry: "詢問",
+    communication: "溝通",
+    other: "其他",
   };
 
   const statusLabels: Record<string, string> = {
@@ -304,14 +360,12 @@ export default function ClientsPage() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
-                    {works.length > 0 && (
-                      <button
-                        onClick={() => setExpandedId(isExpanded ? null : client.id)}
-                        className="text-sm text-primary hover:text-accent"
-                      >
-                        {works.length} 件作品 {isExpanded ? "▲" : "▼"}
-                      </button>
-                    )}
+                    <button
+                      onClick={() => setExpandedId(isExpanded ? null : client.id)}
+                      className="text-sm text-primary hover:text-accent"
+                    >
+                      詳情 {isExpanded ? "▲" : "▼"}
+                    </button>
                     <button
                       onClick={() => handleEdit(client)}
                       className="text-primary hover:text-accent text-sm"
@@ -327,48 +381,175 @@ export default function ClientsPage() {
                   </div>
                 </div>
 
-                {/* Expandable purchase history */}
-                {isExpanded && works.length > 0 && (
-                  <div className="border-t border-border bg-background px-4 py-3">
-                    <p className="text-sm font-medium mb-2">消費紀錄</p>
-                    <div className="space-y-2">
-                      {works.map((work) => (
-                        <a
-                          key={work.id}
-                          href={`/works/${work.id}`}
-                          className="flex items-center justify-between px-3 py-2 rounded-lg hover:bg-card transition-colors"
-                        >
-                          <div className="flex items-center gap-3">
-                            {work.image_urls?.[0] ? (
-                              <img
-                                src={work.image_urls[0]}
-                                alt={work.name}
-                                className="w-10 h-10 rounded object-cover border border-border"
-                              />
-                            ) : (
-                              <div className="w-10 h-10 rounded bg-border flex items-center justify-center text-xs text-muted">
-                                無圖
+                {/* Expandable details */}
+                {isExpanded && (
+                  <div className="border-t border-border bg-background">
+                    {/* Purchase history */}
+                    {works.length > 0 && (
+                      <div className="px-4 py-3 border-b border-border">
+                        <p className="text-sm font-medium mb-2">消費紀錄 ({works.length})</p>
+                        <div className="space-y-2">
+                          {works.map((work) => (
+                            <a
+                              key={work.id}
+                              href={`/works/${work.id}`}
+                              className="flex items-center justify-between px-3 py-2 rounded-lg hover:bg-card transition-colors"
+                            >
+                              <div className="flex items-center gap-3">
+                                {work.image_urls?.[0] ? (
+                                  <img
+                                    src={work.image_urls[0]}
+                                    alt={work.name}
+                                    className="w-10 h-10 rounded object-cover border border-border"
+                                  />
+                                ) : (
+                                  <div className="w-10 h-10 rounded bg-border flex items-center justify-center text-xs text-muted">
+                                    無圖
+                                  </div>
+                                )}
+                                <div>
+                                  <span className="font-medium text-sm">{work.name}</span>
+                                  <span className="text-xs text-muted ml-2">
+                                    {statusLabels[work.status] ?? work.status}
+                                  </span>
+                                </div>
                               </div>
+                              <div className="text-right text-sm">
+                                {work.price ? (
+                                  <span className="text-primary font-medium">NT${work.price}</span>
+                                ) : (
+                                  <span className="text-muted">—</span>
+                                )}
+                                <p className="text-xs text-muted">
+                                  {new Date(work.created_at).toLocaleDateString("zh-TW")}
+                                </p>
+                              </div>
+                            </a>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Notes / interaction history */}
+                    <div className="px-4 py-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="text-sm font-medium">往來紀錄</p>
+                        <button
+                          onClick={() =>
+                            setNoteForm(
+                              noteForm?.clientId === client.id
+                                ? null
+                                : { clientId: client.id, type: "communication", content: "", images: [] }
+                            )
+                          }
+                          className="text-sm text-primary hover:text-accent"
+                        >
+                          + 新增紀錄
+                        </button>
+                      </div>
+
+                      {/* Add note form */}
+                      {noteForm?.clientId === client.id && (
+                        <div className="bg-card border border-border rounded-lg p-3 mb-3 space-y-2">
+                          <select
+                            className={inputClass}
+                            value={noteForm.type}
+                            onChange={(e) =>
+                              setNoteForm({ ...noteForm, type: e.target.value as ClientNote["type"] })
+                            }
+                          >
+                            <option value="feedback">回饋</option>
+                            <option value="inquiry">詢問</option>
+                            <option value="communication">溝通</option>
+                            <option value="other">其他</option>
+                          </select>
+                          <textarea
+                            className={inputClass}
+                            rows={2}
+                            value={noteForm.content}
+                            onChange={(e) => setNoteForm({ ...noteForm, content: e.target.value })}
+                            placeholder="記錄內容..."
+                          />
+                          <div>
+                            <label className="block text-xs text-muted mb-1">附加圖片</label>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              multiple
+                              onChange={(e) =>
+                                setNoteForm({ ...noteForm, images: Array.from(e.target.files ?? []) })
+                              }
+                              className={inputClass}
+                            />
+                            {noteForm.images.length > 0 && (
+                              <p className="text-xs text-muted mt-1">已選擇 {noteForm.images.length} 張圖片</p>
                             )}
-                            <div>
-                              <span className="font-medium text-sm">{work.name}</span>
-                              <span className="text-xs text-muted ml-2">
-                                {statusLabels[work.status] ?? work.status}
-                              </span>
+                          </div>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={handleAddNote}
+                              className="bg-primary text-white px-4 py-1 rounded-lg text-sm hover:bg-accent"
+                            >
+                              儲存
+                            </button>
+                            <button
+                              onClick={() => setNoteForm(null)}
+                              className="text-muted text-sm"
+                            >
+                              取消
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Notes list */}
+                      {(clientNotes[client.id] ?? []).length === 0 ? (
+                        <p className="text-sm text-muted">尚無紀錄</p>
+                      ) : (
+                        <div className="space-y-2">
+                          {(clientNotes[client.id] ?? []).map((note) => (
+                            <div
+                              key={note.id}
+                              className="flex items-start justify-between px-3 py-2 rounded-lg bg-card border border-border"
+                            >
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary">
+                                    {noteTypeLabels[note.type] ?? note.type}
+                                  </span>
+                                  <span className="text-xs text-muted">
+                                    {new Date(note.created_at).toLocaleDateString("zh-TW")}{" "}
+                                    {new Date(note.created_at).toLocaleTimeString("zh-TW", {
+                                      hour: "2-digit",
+                                      minute: "2-digit",
+                                    })}
+                                  </span>
+                                </div>
+                                <p className="text-sm whitespace-pre-wrap">{note.content}</p>
+                                {note.image_urls?.length > 0 && (
+                                  <div className="flex gap-2 mt-2 flex-wrap">
+                                    {note.image_urls.map((url, i) => (
+                                      <img
+                                        key={i}
+                                        src={url}
+                                        alt={`紀錄圖片 ${i + 1}`}
+                                        className="w-20 h-20 object-cover rounded border border-border cursor-pointer hover:opacity-80"
+                                        onClick={() => window.open(url, "_blank")}
+                                      />
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                              <button
+                                onClick={() => handleDeleteNote(note.id)}
+                                className="text-red-400 hover:text-red-600 text-xs ml-2 shrink-0"
+                              >
+                                刪除
+                              </button>
                             </div>
-                          </div>
-                          <div className="text-right text-sm">
-                            {work.price ? (
-                              <span className="text-primary font-medium">NT${work.price}</span>
-                            ) : (
-                              <span className="text-muted">—</span>
-                            )}
-                            <p className="text-xs text-muted">
-                              {new Date(work.created_at).toLocaleDateString("zh-TW")}
-                            </p>
-                          </div>
-                        </a>
-                      ))}
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
