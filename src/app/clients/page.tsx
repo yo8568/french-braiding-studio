@@ -2,16 +2,23 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase";
-import type { Client } from "@/lib/types";
+import type { Client, Work } from "@/lib/types";
 
 export default function ClientsPage() {
   const supabase = createClient();
   const [clients, setClients] = useState<Client[]>([]);
+  const [clientWorks, setClientWorks] = useState<Record<string, Work[]>>({});
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const [form, setForm] = useState({
     name: "",
+    phone: "",
+    shipping_method: "" as "" | "delivery" | "convenience_store",
+    shipping_address: "",
+    store_name: "",
+    store_branch: "",
     bio: "",
   });
 
@@ -25,12 +32,39 @@ export default function ClientsPage() {
       .from("clients")
       .select("*")
       .order("name");
-    setClients((data as Client[]) ?? []);
+    const clientList = (data as Client[]) ?? [];
+    setClients(clientList);
+
+    // Load works for all clients
+    if (clientList.length > 0) {
+      const ids = clientList.map((c) => c.id);
+      const { data: works } = await supabase
+        .from("works")
+        .select("*")
+        .in("client_id", ids)
+        .order("created_at", { ascending: false });
+
+      const grouped: Record<string, Work[]> = {};
+      for (const w of (works as Work[]) ?? []) {
+        if (!grouped[w.client_id]) grouped[w.client_id] = [];
+        grouped[w.client_id].push(w);
+      }
+      setClientWorks(grouped);
+    }
+
     setLoading(false);
   }
 
   function resetForm() {
-    setForm({ name: "", bio: "" });
+    setForm({
+      name: "",
+      phone: "",
+      shipping_method: "",
+      shipping_address: "",
+      store_name: "",
+      store_branch: "",
+      bio: "",
+    });
     setEditingId(null);
     setShowForm(false);
   }
@@ -38,6 +72,11 @@ export default function ClientsPage() {
   function handleEdit(client: Client) {
     setForm({
       name: client.name,
+      phone: client.phone ?? "",
+      shipping_method: client.shipping_method ?? "",
+      shipping_address: client.shipping_address ?? "",
+      store_name: client.store_name ?? "",
+      store_branch: client.store_branch ?? "",
       bio: client.bio ?? "",
     });
     setEditingId(client.id);
@@ -50,6 +89,11 @@ export default function ClientsPage() {
 
     const payload = {
       name: form.name.trim(),
+      phone: form.phone || null,
+      shipping_method: form.shipping_method || null,
+      shipping_address: form.shipping_method === "delivery" ? (form.shipping_address || null) : null,
+      store_name: form.shipping_method === "convenience_store" ? (form.store_name || null) : null,
+      store_branch: form.shipping_method === "convenience_store" ? (form.store_branch || null) : null,
       bio: form.bio || null,
     };
 
@@ -71,6 +115,18 @@ export default function ClientsPage() {
 
   const inputClass =
     "w-full border border-border rounded-lg px-3 py-2 bg-card focus:outline-none focus:ring-2 focus:ring-primary/30";
+
+  const shippingLabels: Record<string, string> = {
+    delivery: "宅配",
+    convenience_store: "超商取貨",
+  };
+
+  const statusLabels: Record<string, string> = {
+    in_progress: "製作中",
+    completed: "已完成",
+    for_sale: "販售中",
+    sold: "已售出",
+  };
 
   if (loading)
     return <div className="text-center py-16 text-muted">載入中...</div>;
@@ -99,7 +155,7 @@ export default function ClientsPage() {
           <h2 className="text-xl font-semibold text-primary">
             {editingId ? "編輯客戶" : "新增客戶"}
           </h2>
-          <div className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium mb-1">姓名 *</label>
               <input
@@ -111,6 +167,73 @@ export default function ClientsPage() {
               />
             </div>
             <div>
+              <label className="block text-sm font-medium mb-1">電話</label>
+              <input
+                className={inputClass}
+                value={form.phone}
+                onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                placeholder="0912-345-678"
+              />
+            </div>
+            <div className="sm:col-span-2">
+              <label className="block text-sm font-medium mb-1">運送方式</label>
+              <select
+                className={inputClass}
+                value={form.shipping_method}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    shipping_method: e.target.value as "" | "delivery" | "convenience_store",
+                  })
+                }
+              >
+                <option value="">未設定</option>
+                <option value="delivery">宅配</option>
+                <option value="convenience_store">超商取貨</option>
+              </select>
+            </div>
+
+            {form.shipping_method === "delivery" && (
+              <div className="sm:col-span-2">
+                <label className="block text-sm font-medium mb-1">宅配地址</label>
+                <input
+                  className={inputClass}
+                  value={form.shipping_address}
+                  onChange={(e) => setForm({ ...form, shipping_address: e.target.value })}
+                  placeholder="台北市信義區..."
+                />
+              </div>
+            )}
+
+            {form.shipping_method === "convenience_store" && (
+              <>
+                <div>
+                  <label className="block text-sm font-medium mb-1">超商名稱</label>
+                  <select
+                    className={inputClass}
+                    value={form.store_name}
+                    onChange={(e) => setForm({ ...form, store_name: e.target.value })}
+                  >
+                    <option value="">選擇超商</option>
+                    <option value="7-ELEVEN">7-ELEVEN</option>
+                    <option value="全家">全家</option>
+                    <option value="萊爾富">萊爾富</option>
+                    <option value="OK超商">OK超商</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">門市名稱</label>
+                  <input
+                    className={inputClass}
+                    value={form.store_branch}
+                    onChange={(e) => setForm({ ...form, store_branch: e.target.value })}
+                    placeholder="例：信義門市"
+                  />
+                </div>
+              </>
+            )}
+
+            <div className="sm:col-span-2">
               <label className="block text-sm font-medium mb-1">備註</label>
               <textarea
                 className={inputClass}
@@ -143,31 +266,55 @@ export default function ClientsPage() {
       {clients.length === 0 ? (
         <div className="text-center py-16 text-muted">尚無客戶</div>
       ) : (
-        <div className="bg-card border border-border rounded-xl overflow-hidden">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-border bg-background">
-                <th className="text-left px-4 py-3 text-sm font-medium">姓名</th>
-                <th className="text-left px-4 py-3 text-sm font-medium">備註</th>
-                <th className="text-left px-4 py-3 text-sm font-medium">建立日期</th>
-                <th className="text-right px-4 py-3 text-sm font-medium">操作</th>
-              </tr>
-            </thead>
-            <tbody>
-              {clients.map((client) => (
-                <tr
-                  key={client.id}
-                  className="border-b border-border last:border-0 hover:bg-background/50"
-                >
-                  <td className="px-4 py-3 font-medium">{client.name}</td>
-                  <td className="px-4 py-3 text-muted">{client.bio ?? "—"}</td>
-                  <td className="px-4 py-3 text-muted text-sm">
-                    {new Date(client.created_at).toLocaleDateString("zh-TW")}
-                  </td>
-                  <td className="px-4 py-3 text-right">
+        <div className="space-y-4">
+          {clients.map((client) => {
+            const works = clientWorks[client.id] ?? [];
+            const isExpanded = expandedId === client.id;
+
+            return (
+              <div
+                key={client.id}
+                className="bg-card border border-border rounded-xl overflow-hidden"
+              >
+                {/* Client info row */}
+                <div className="p-4 flex items-center gap-4">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-3">
+                      <span className="font-semibold text-lg">{client.name}</span>
+                      {client.phone && (
+                        <span className="text-sm text-muted">{client.phone}</span>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1 text-sm text-muted">
+                      {client.shipping_method && (
+                        <span>
+                          {shippingLabels[client.shipping_method] ?? client.shipping_method}
+                          {client.shipping_method === "delivery" && client.shipping_address && (
+                            <> — {client.shipping_address}</>
+                          )}
+                          {client.shipping_method === "convenience_store" && (
+                            <>
+                              {client.store_name && <> — {client.store_name}</>}
+                              {client.store_branch && <> {client.store_branch}</>}
+                            </>
+                          )}
+                        </span>
+                      )}
+                      {client.bio && <span>{client.bio}</span>}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {works.length > 0 && (
+                      <button
+                        onClick={() => setExpandedId(isExpanded ? null : client.id)}
+                        className="text-sm text-primary hover:text-accent"
+                      >
+                        {works.length} 件作品 {isExpanded ? "▲" : "▼"}
+                      </button>
+                    )}
                     <button
                       onClick={() => handleEdit(client)}
-                      className="text-primary hover:text-accent text-sm mr-3"
+                      className="text-primary hover:text-accent text-sm"
                     >
                       編輯
                     </button>
@@ -177,11 +324,57 @@ export default function ClientsPage() {
                     >
                       刪除
                     </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                  </div>
+                </div>
+
+                {/* Expandable purchase history */}
+                {isExpanded && works.length > 0 && (
+                  <div className="border-t border-border bg-background px-4 py-3">
+                    <p className="text-sm font-medium mb-2">消費紀錄</p>
+                    <div className="space-y-2">
+                      {works.map((work) => (
+                        <a
+                          key={work.id}
+                          href={`/works/${work.id}`}
+                          className="flex items-center justify-between px-3 py-2 rounded-lg hover:bg-card transition-colors"
+                        >
+                          <div className="flex items-center gap-3">
+                            {work.image_urls?.[0] ? (
+                              <img
+                                src={work.image_urls[0]}
+                                alt={work.name}
+                                className="w-10 h-10 rounded object-cover border border-border"
+                              />
+                            ) : (
+                              <div className="w-10 h-10 rounded bg-border flex items-center justify-center text-xs text-muted">
+                                無圖
+                              </div>
+                            )}
+                            <div>
+                              <span className="font-medium text-sm">{work.name}</span>
+                              <span className="text-xs text-muted ml-2">
+                                {statusLabels[work.status] ?? work.status}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="text-right text-sm">
+                            {work.price ? (
+                              <span className="text-primary font-medium">NT${work.price}</span>
+                            ) : (
+                              <span className="text-muted">—</span>
+                            )}
+                            <p className="text-xs text-muted">
+                              {new Date(work.created_at).toLocaleDateString("zh-TW")}
+                            </p>
+                          </div>
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
     </div>

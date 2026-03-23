@@ -1,6 +1,11 @@
 export interface Client {
   id: string;
   name: string;
+  phone?: string;
+  shipping_method?: "delivery" | "convenience_store";
+  shipping_address?: string;
+  store_name?: string;
+  store_branch?: string;
   avatar_url?: string;
   bio?: string;
   created_at: string;
