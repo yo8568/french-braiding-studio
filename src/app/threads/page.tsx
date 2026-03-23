@@ -15,6 +15,7 @@ export default function ThreadsPage() {
     color_hex: "#000000",
     material: "",
     thickness_mm: "",
+    source: "",
   });
 
   useEffect(() => {
@@ -32,7 +33,7 @@ export default function ThreadsPage() {
   }
 
   function resetForm() {
-    setForm({ color_name: "", color_hex: "#000000", material: "", thickness_mm: "" });
+    setForm({ color_name: "", color_hex: "#000000", material: "", thickness_mm: "", source: "" });
     setEditingId(null);
     setShowForm(false);
   }
@@ -43,6 +44,7 @@ export default function ThreadsPage() {
       color_hex: thread.color_hex,
       material: thread.material ?? "",
       thickness_mm: thread.thickness_mm?.toString() ?? "",
+      source: thread.source ?? "",
     });
     setEditingId(thread.id);
     setShowForm(true);
@@ -57,6 +59,7 @@ export default function ThreadsPage() {
       color_hex: form.color_hex,
       material: form.material || null,
       thickness_mm: form.thickness_mm ? parseFloat(form.thickness_mm) : null,
+      source: form.source || null,
     };
 
     if (editingId) {
@@ -148,6 +151,15 @@ export default function ThreadsPage() {
                 placeholder="例：0.8"
               />
             </div>
+            <div className="sm:col-span-2">
+              <label className="block text-sm font-medium mb-1">來源</label>
+              <input
+                className={inputClass}
+                value={form.source}
+                onChange={(e) => setForm({ ...form, source: e.target.value })}
+                placeholder="例：蝦皮、手藝材料行、朋友送的"
+              />
+            </div>
           </div>
           <div className="flex gap-3">
             <button
@@ -179,6 +191,7 @@ export default function ThreadsPage() {
                 <th className="text-left px-4 py-3 text-sm font-medium">名稱</th>
                 <th className="text-left px-4 py-3 text-sm font-medium">材質</th>
                 <th className="text-left px-4 py-3 text-sm font-medium">粗細</th>
+                <th className="text-left px-4 py-3 text-sm font-medium">來源</th>
                 <th className="text-right px-4 py-3 text-sm font-medium">操作</th>
               </tr>
             </thead>
@@ -200,6 +213,7 @@ export default function ThreadsPage() {
                   <td className="px-4 py-3 text-muted">
                     {thread.thickness_mm ? `${thread.thickness_mm} mm` : "—"}
                   </td>
+                  <td className="px-4 py-3 text-muted">{thread.source ?? "—"}</td>
                   <td className="px-4 py-3 text-right">
                     <button
                       onClick={() => handleEdit(thread)}

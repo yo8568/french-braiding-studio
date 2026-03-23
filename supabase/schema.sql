@@ -37,6 +37,7 @@ CREATE TABLE threads (
   color_hex TEXT NOT NULL DEFAULT '#000000',
   material TEXT,
   thickness_mm DECIMAL(3, 1),
+  source TEXT,
   created_at TIMESTAMPTZ DEFAULT now()
 );
 

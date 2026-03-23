@@ -33,6 +33,7 @@ export interface Thread {
   color_hex: string;
   material?: string;
   thickness_mm?: number;
+  source?: string;
   created_at: string;
 }
 
