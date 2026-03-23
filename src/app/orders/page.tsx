@@ -12,7 +12,14 @@ export default function OrdersPage() {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [expandedNotes, setExpandedNotes] = useState<Record<string, ClientNote[]>>({});
+  const [orderNotes, setOrderNotes] = useState<Record<string, ClientNote[]>>({});
+  const [noteForm, setNoteForm] = useState<{
+    orderId: string;
+    clientId: string;
+    type: ClientNote["type"];
+    content: string;
+    images: File[];
+  } | null>(null);
 
   const [form, setForm] = useState({
     client_id: "",
@@ -129,19 +136,61 @@ export default function OrdersPage() {
     loadAll();
   }
 
-  async function toggleNotes(clientId: string) {
-    if (expandedNotes[clientId]) {
-      const updated = { ...expandedNotes };
-      delete updated[clientId];
-      setExpandedNotes(updated);
+  async function loadOrderNotes(orderId: string) {
+    if (orderNotes[orderId]) {
+      const updated = { ...orderNotes };
+      delete updated[orderId];
+      setOrderNotes(updated);
       return;
     }
     const { data } = await supabase
       .from("client_notes")
       .select("*")
-      .eq("client_id", clientId)
+      .eq("order_id", orderId)
       .order("created_at", { ascending: false });
-    setExpandedNotes({ ...expandedNotes, [clientId]: (data as ClientNote[]) ?? [] });
+    setOrderNotes({ ...orderNotes, [orderId]: (data as ClientNote[]) ?? [] });
+  }
+
+  async function handleAddNote() {
+    if (!noteForm || !noteForm.content.trim()) return;
+
+    const imageUrls: string[] = [];
+    for (const file of noteForm.images) {
+      const ext = file.name.split(".").pop();
+      const path = `notes/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+      const { error } = await supabase.storage.from("work-images").upload(path, file);
+      if (!error) {
+        const { data: { publicUrl } } = supabase.storage.from("work-images").getPublicUrl(path);
+        imageUrls.push(publicUrl);
+      }
+    }
+
+    await supabase.from("client_notes").insert({
+      client_id: noteForm.clientId,
+      order_id: noteForm.orderId,
+      type: noteForm.type,
+      content: noteForm.content.trim(),
+      image_urls: imageUrls,
+    });
+
+    setNoteForm(null);
+    // Reload notes for this order
+    const { data } = await supabase
+      .from("client_notes")
+      .select("*")
+      .eq("order_id", noteForm.orderId)
+      .order("created_at", { ascending: false });
+    setOrderNotes({ ...orderNotes, [noteForm.orderId]: (data as ClientNote[]) ?? [] });
+  }
+
+  async function handleDeleteNote(noteId: string, orderId: string) {
+    await supabase.from("client_notes").delete().eq("id", noteId);
+    const { data } = await supabase
+      .from("client_notes")
+      .select("*")
+      .eq("order_id", orderId)
+      .order("created_at", { ascending: false });
+    setOrderNotes({ ...orderNotes, [orderId]: (data as ClientNote[]) ?? [] });
   }
 
   const inputClass =
@@ -383,7 +432,7 @@ export default function OrdersPage() {
         <div className="space-y-4">
           {orders.map((order) => {
             const isExpanded = expandedId === order.id;
-            const notes = order.client_id ? expandedNotes[order.client_id] : undefined;
+            const notes = orderNotes[order.id];
 
             return (
               <div
@@ -492,31 +541,107 @@ export default function OrdersPage() {
                       </div>
                     )}
 
-                    {/* Linked client feedback */}
-                    {order.client_id && (
-                      <div className="px-4 py-3">
+                    {/* Order feedback */}
+                    <div className="px-4 py-3">
+                      <div className="flex items-center justify-between mb-2">
                         <button
-                          onClick={() => toggleNotes(order.client_id!)}
+                          onClick={() => loadOrderNotes(order.id)}
                           className="text-sm font-medium text-primary hover:text-accent"
                         >
-                          {notes ? "隱藏客戶回饋 ▲" : "查看客戶回饋 ▼"}
+                          {notes ? "隱藏回饋紀錄 ▲" : "查看回饋紀錄 ▼"}
                         </button>
-                        {notes && (
-                          <div className="mt-2 space-y-2">
-                            {notes.length === 0 ? (
-                              <p className="text-sm text-muted">此客戶尚無回饋紀錄</p>
-                            ) : (
-                              notes.map((note) => (
-                                <div
-                                  key={note.id}
-                                  className="px-3 py-2 rounded-lg bg-card border border-border"
-                                >
+                        <button
+                          onClick={() =>
+                            setNoteForm(
+                              noteForm?.orderId === order.id
+                                ? null
+                                : {
+                                    orderId: order.id,
+                                    clientId: order.client_id ?? "",
+                                    type: "feedback",
+                                    content: "",
+                                    images: [],
+                                  }
+                            )
+                          }
+                          className="text-sm text-primary hover:text-accent"
+                        >
+                          + 新增回饋
+                        </button>
+                      </div>
+
+                      {/* Add note form */}
+                      {noteForm?.orderId === order.id && (
+                        <div className="bg-card border border-border rounded-lg p-3 mb-3 space-y-2">
+                          <select
+                            className={inputClass}
+                            value={noteForm.type}
+                            onChange={(e) =>
+                              setNoteForm({ ...noteForm, type: e.target.value as ClientNote["type"] })
+                            }
+                          >
+                            <option value="feedback">回饋</option>
+                            <option value="inquiry">詢問</option>
+                            <option value="communication">溝通</option>
+                            <option value="other">其他</option>
+                          </select>
+                          <textarea
+                            className={inputClass}
+                            rows={2}
+                            value={noteForm.content}
+                            onChange={(e) => setNoteForm({ ...noteForm, content: e.target.value })}
+                            placeholder="記錄內容..."
+                          />
+                          <div>
+                            <label className="block text-xs text-muted mb-1">附加圖片</label>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              multiple
+                              onChange={(e) =>
+                                setNoteForm({ ...noteForm, images: Array.from(e.target.files ?? []) })
+                              }
+                              className={inputClass}
+                            />
+                          </div>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={handleAddNote}
+                              className="bg-primary text-white px-4 py-1 rounded-lg text-sm hover:bg-accent"
+                            >
+                              儲存
+                            </button>
+                            <button
+                              onClick={() => setNoteForm(null)}
+                              className="text-muted text-sm"
+                            >
+                              取消
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {notes && (
+                        <div className="space-y-2">
+                          {notes.length === 0 ? (
+                            <p className="text-sm text-muted">此訂單尚無回饋紀錄</p>
+                          ) : (
+                            notes.map((note) => (
+                              <div
+                                key={note.id}
+                                className="flex items-start justify-between px-3 py-2 rounded-lg bg-card border border-border"
+                              >
+                                <div className="flex-1 min-w-0">
                                   <div className="flex items-center gap-2 mb-1">
                                     <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary">
                                       {noteTypeLabels[note.type] ?? note.type}
                                     </span>
                                     <span className="text-xs text-muted">
-                                      {new Date(note.created_at).toLocaleDateString("zh-TW")}
+                                      {new Date(note.created_at).toLocaleDateString("zh-TW")}{" "}
+                                      {new Date(note.created_at).toLocaleTimeString("zh-TW", {
+                                        hour: "2-digit",
+                                        minute: "2-digit",
+                                      })}
                                     </span>
                                   </div>
                                   <p className="text-sm whitespace-pre-wrap">{note.content}</p>
@@ -534,12 +659,18 @@ export default function OrdersPage() {
                                     </div>
                                   )}
                                 </div>
-                              ))
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    )}
+                                <button
+                                  onClick={() => handleDeleteNote(note.id, order.id)}
+                                  className="text-red-400 hover:text-red-600 text-xs ml-2 shrink-0"
+                                >
+                                  刪除
+                                </button>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>

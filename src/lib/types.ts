@@ -14,10 +14,13 @@ export interface Client {
 export interface ClientNote {
   id: string;
   client_id: string;
+  order_id?: string;
   type: "feedback" | "inquiry" | "communication" | "other";
   content: string;
   image_urls: string[];
   created_at: string;
+  // joined
+  order?: Order;
 }
 
 export interface Order {
