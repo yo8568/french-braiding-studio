@@ -20,6 +20,32 @@ export interface ClientNote {
   created_at: string;
 }
 
+export interface Order {
+  id: string;
+  client_id: string;
+  shipping_method?: "delivery" | "convenience_store";
+  shipping_address?: string;
+  store_name?: string;
+  store_branch?: string;
+  total_amount?: number;
+  status: "pending" | "shipped" | "delivered" | "cancelled";
+  notes?: string;
+  created_at: string;
+  // joined
+  client?: Client;
+  order_items?: OrderItem[];
+}
+
+export interface OrderItem {
+  id: string;
+  order_id: string;
+  work_id: string;
+  price: number;
+  quantity: number;
+  // joined
+  work?: Work;
+}
+
 export interface Work {
   id: string;
   client_id: string;
