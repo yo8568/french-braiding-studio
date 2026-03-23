@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase";
 import type { Work, WorkThread, WorkTechnique } from "@/lib/types";
 
@@ -69,9 +70,17 @@ export default function WorkDetailPage() {
             {new Date(work.created_at).toLocaleDateString("zh-TW")}
           </p>
         </div>
-        <span className="px-3 py-1 rounded-full bg-primary/10 text-primary text-sm">
-          {statusLabels[work.status] ?? work.status}
-        </span>
+        <div className="flex items-center gap-3">
+          <span className="px-3 py-1 rounded-full bg-primary/10 text-primary text-sm">
+            {statusLabels[work.status] ?? work.status}
+          </span>
+          <Link
+            href={`/works/${params.id}/edit`}
+            className="px-4 py-1 rounded-lg bg-primary text-white text-sm hover:bg-accent transition-colors"
+          >
+            編輯
+          </Link>
+        </div>
       </div>
 
       {/* Images */}
