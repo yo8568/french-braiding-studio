@@ -3,8 +3,8 @@
 -- Run this in Supabase SQL Editor
 -- =============================================
 
--- 編織者
-CREATE TABLE creators (
+-- 客戶
+CREATE TABLE clients (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   name TEXT NOT NULL,
   avatar_url TEXT,
@@ -15,7 +15,7 @@ CREATE TABLE creators (
 -- 作品
 CREATE TABLE works (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  creator_id UUID REFERENCES creators(id) ON DELETE CASCADE,
+  client_id UUID REFERENCES clients(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
   description TEXT,
   image_urls TEXT[] DEFAULT '{}',
@@ -91,7 +91,7 @@ CREATE TRIGGER works_updated_at
   FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
 -- 建立索引
-CREATE INDEX idx_works_creator ON works(creator_id);
+CREATE INDEX idx_works_client ON works(client_id);
 CREATE INDEX idx_works_status ON works(status);
 CREATE INDEX idx_work_threads_work ON work_threads(work_id);
 CREATE INDEX idx_work_techniques_work ON work_techniques(work_id);
@@ -131,7 +131,7 @@ ALTER TABLE techniques ENABLE ROW LEVEL SECURITY;
 ALTER TABLE work_techniques ENABLE ROW LEVEL SECURITY;
 ALTER TABLE cord_presets ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Allow all" ON creators FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all" ON clients FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow all" ON works FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow all" ON threads FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow all" ON work_threads FOR ALL USING (true) WITH CHECK (true);

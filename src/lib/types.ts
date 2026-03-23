@@ -1,4 +1,4 @@
-export interface Creator {
+export interface Client {
   id: string;
   name: string;
   avatar_url?: string;
@@ -8,7 +8,7 @@ export interface Creator {
 
 export interface Work {
   id: string;
-  creator_id: string;
+  client_id: string;
   name: string;
   description?: string;
   image_urls: string[];
@@ -22,7 +22,7 @@ export interface Work {
   created_at: string;
   updated_at: string;
   // joined
-  creator?: Creator;
+  client?: Client;
   work_threads?: WorkThread[];
   work_techniques?: WorkTechnique[];
 }

@@ -6,31 +6,31 @@ import type { Work } from "@/lib/types";
 
 export default function Home() {
   const [recentWorks, setRecentWorks] = useState<Work[]>([]);
-  const [stats, setStats] = useState({ works: 0, creators: 0, techniques: 0 });
+  const [stats, setStats] = useState({ works: 0, clients: 0, techniques: 0 });
 
   useEffect(() => {
     const supabase = createClient();
 
     async function load() {
-      const [worksRes, creatorsRes, techniquesRes, recentRes] =
+      const [worksRes, clientsRes, techniquesRes, recentRes] =
         await Promise.all([
           supabase.from("works").select("*", { count: "exact", head: true }),
           supabase
-            .from("creators")
+            .from("clients")
             .select("*", { count: "exact", head: true }),
           supabase
             .from("techniques")
             .select("*", { count: "exact", head: true }),
           supabase
             .from("works")
-            .select("*, creator:creators(*)")
+            .select("*, client:clients(*)")
             .order("created_at", { ascending: false })
             .limit(6),
         ]);
 
       setStats({
         works: worksRes.count ?? 0,
-        creators: creatorsRes.count ?? 0,
+        clients: clientsRes.count ?? 0,
         techniques: techniquesRes.count ?? 0,
       });
       setRecentWorks((recentRes.data as Work[]) ?? []);
@@ -57,9 +57,9 @@ export default function Home() {
         </div>
         <div className="bg-card border border-border rounded-xl p-6">
           <div className="text-3xl font-bold text-primary">
-            {stats.creators}
+            {stats.clients}
           </div>
-          <div className="text-muted mt-1">位編織者</div>
+          <div className="text-muted mt-1">位客戶</div>
         </div>
         <div className="bg-card border border-border rounded-xl p-6">
           <div className="text-3xl font-bold text-primary">
@@ -103,7 +103,7 @@ export default function Home() {
                 <div className="p-4">
                   <h3 className="font-semibold">{work.name}</h3>
                   <p className="text-sm text-muted mt-1">
-                    {work.creator?.name} &middot;{" "}
+                    {work.client?.name} &middot;{" "}
                     {work.price ? `NT$${work.price}` : "未定價"}
                   </p>
                 </div>

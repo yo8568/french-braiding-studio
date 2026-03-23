@@ -20,7 +20,7 @@ export default function WorkDetailPage() {
       const [workRes, threadsRes, techniquesRes] = await Promise.all([
         supabase
           .from("works")
-          .select("*, creator:creators(*)")
+          .select("*, client:clients(*)")
           .eq("id", params.id)
           .single(),
         supabase
@@ -66,7 +66,7 @@ export default function WorkDetailPage() {
         <div>
           <h1 className="text-3xl font-bold">{work.name}</h1>
           <p className="text-muted mt-1">
-            {work.creator?.name ?? "未知編織者"} &middot;{" "}
+            {work.client?.name ?? "未知客戶"} &middot;{" "}
             {new Date(work.created_at).toLocaleDateString("zh-TW")}
           </p>
         </div>

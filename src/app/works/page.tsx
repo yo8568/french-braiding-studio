@@ -14,7 +14,7 @@ export default function WorksPage() {
     async function load() {
       let query = supabase
         .from("works")
-        .select("*, creator:creators(*)")
+        .select("*, client:clients(*)")
         .order("created_at", { ascending: false });
 
       if (filter !== "all") {
@@ -93,7 +93,7 @@ export default function WorksPage() {
                   </span>
                 </div>
                 <p className="text-sm text-muted mt-1">
-                  {work.creator?.name}
+                  {work.client?.name}
                 </p>
                 {work.price && (
                   <p className="text-primary font-medium mt-2">

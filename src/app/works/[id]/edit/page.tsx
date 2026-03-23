@@ -3,21 +3,21 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase";
-import type { Creator, Thread, Technique } from "@/lib/types";
+import type { Client, Thread, Technique } from "@/lib/types";
 
 export default function EditWorkPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const supabase = createClient();
 
-  const [creators, setCreators] = useState<Creator[]>([]);
+  const [clients, setClients] = useState<Client[]>([]);
   const [threads, setThreads] = useState<Thread[]>([]);
   const [techniques, setTechniques] = useState<Technique[]>([]);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const [form, setForm] = useState({
-    creator_id: "",
+    client_id: "",
     name: "",
     description: "",
     price: "",
@@ -41,20 +41,20 @@ export default function EditWorkPage() {
     { technique_id: string; usage_count: string; notes: string }[]
   >([]);
 
-  const [newCreator, setNewCreator] = useState("");
+  const [newClient, setNewClient] = useState("");
   const [newThread, setNewThread] = useState({
     color_name: "",
     color_hex: "#000000",
     material: "",
     thickness_mm: "",
   });
-  const [showNewCreator, setShowNewCreator] = useState(false);
+  const [showNewClient, setShowNewClient] = useState(false);
   const [showNewThread, setShowNewThread] = useState(false);
 
   useEffect(() => {
     async function load() {
       const [c, t, tech, workRes, wtRes, wteRes] = await Promise.all([
-        supabase.from("creators").select("*").order("name"),
+        supabase.from("clients").select("*").order("name"),
         supabase.from("threads").select("*").order("color_name"),
         supabase.from("techniques").select("*").order("name"),
         supabase.from("works").select("*").eq("id", params.id).single(),
@@ -62,14 +62,14 @@ export default function EditWorkPage() {
         supabase.from("work_techniques").select("*").eq("work_id", params.id),
       ]);
 
-      setCreators(c.data ?? []);
+      setClients(c.data ?? []);
       setThreads(t.data ?? []);
       setTechniques(tech.data ?? []);
 
       if (workRes.data) {
         const w = workRes.data;
         setForm({
-          creator_id: w.creator_id ?? "",
+          client_id: w.client_id ?? "",
           name: w.name ?? "",
           description: w.description ?? "",
           price: w.price?.toString() ?? "",
@@ -109,18 +109,18 @@ export default function EditWorkPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.id]);
 
-  async function handleAddCreator() {
-    if (!newCreator.trim()) return;
+  async function handleAddClient() {
+    if (!newClient.trim()) return;
     const { data } = await supabase
-      .from("creators")
-      .insert({ name: newCreator.trim() })
+      .from("clients")
+      .insert({ name: newClient.trim() })
       .select()
       .single();
     if (data) {
-      setCreators((prev) => [...prev, data]);
-      setForm((prev) => ({ ...prev, creator_id: data.id }));
-      setNewCreator("");
-      setShowNewCreator(false);
+      setClients((prev) => [...prev, data]);
+      setForm((prev) => ({ ...prev, client_id: data.id }));
+      setNewClient("");
+      setShowNewClient(false);
     }
   }
 
@@ -190,7 +190,7 @@ export default function EditWorkPage() {
       const { error: workError } = await supabase
         .from("works")
         .update({
-          creator_id: form.creator_id || null,
+          client_id: form.client_id || null,
           name: form.name,
           description: form.description || null,
           image_urls: allImageUrls,
@@ -273,25 +273,25 @@ export default function EditWorkPage() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-1">編織者</label>
-            {showNewCreator ? (
+            <label className="block text-sm font-medium mb-1">客戶</label>
+            {showNewClient ? (
               <div className="flex gap-2">
                 <input
                   className={inputClass}
-                  placeholder="新編織者名稱"
-                  value={newCreator}
-                  onChange={(e) => setNewCreator(e.target.value)}
+                  placeholder="新客戶名稱"
+                  value={newClient}
+                  onChange={(e) => setNewClient(e.target.value)}
                 />
                 <button
                   type="button"
-                  onClick={handleAddCreator}
+                  onClick={handleAddClient}
                   className="bg-primary text-white px-3 rounded-lg shrink-0"
                 >
                   新增
                 </button>
                 <button
                   type="button"
-                  onClick={() => setShowNewCreator(false)}
+                  onClick={() => setShowNewClient(false)}
                   className="text-muted px-2"
                 >
                   取消
@@ -301,13 +301,13 @@ export default function EditWorkPage() {
               <div className="flex gap-2">
                 <select
                   className={inputClass}
-                  value={form.creator_id}
+                  value={form.client_id}
                   onChange={(e) =>
-                    setForm({ ...form, creator_id: e.target.value })
+                    setForm({ ...form, client_id: e.target.value })
                   }
                 >
-                  <option value="">選擇編織者</option>
-                  {creators.map((c) => (
+                  <option value="">選擇客戶</option>
+                  {clients.map((c) => (
                     <option key={c.id} value={c.id}>
                       {c.name}
                     </option>
@@ -315,7 +315,7 @@ export default function EditWorkPage() {
                 </select>
                 <button
                   type="button"
-                  onClick={() => setShowNewCreator(true)}
+                  onClick={() => setShowNewClient(true)}
                   className="text-primary text-sm whitespace-nowrap"
                 >
                   + 新增
