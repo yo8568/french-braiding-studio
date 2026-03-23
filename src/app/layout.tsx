@@ -25,6 +25,9 @@ export default function RootLayout({
             <a href="/works/new" className="hover:text-primary transition-colors">
               新增作品
             </a>
+            <a href="/clients" className="hover:text-primary transition-colors">
+              客戶管理
+            </a>
             <a href="/threads" className="hover:text-primary transition-colors">
               線材管理
             </a>
