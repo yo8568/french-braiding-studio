@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase";
+import { INPUT_CLASS } from "@/lib/constants";
 
 interface CordPreset {
   id: string;
@@ -88,7 +89,7 @@ export default function CalculatorPage() {
             </label>
             <input
               type="number"
-              className="w-full border border-border rounded-lg px-3 py-2 bg-card focus:outline-none focus:ring-2 focus:ring-primary/30"
+              className={INPUT_CLASS}
               value={finishedLength}
               onChange={(e) => setFinishedLength(e.target.value)}
               placeholder="例: 20"
@@ -99,7 +100,7 @@ export default function CalculatorPage() {
             <label className="block text-sm font-medium mb-1">繩子數量</label>
             <input
               type="number"
-              className="w-full border border-border rounded-lg px-3 py-2 bg-card focus:outline-none focus:ring-2 focus:ring-primary/30"
+              className={INPUT_CLASS}
               value={cordCount}
               onChange={(e) => setCordCount(e.target.value)}
               placeholder="1"
@@ -114,7 +115,7 @@ export default function CalculatorPage() {
             <input
               type="number"
               step="0.1"
-              className="w-full border border-border rounded-lg px-3 py-2 bg-card focus:outline-none focus:ring-2 focus:ring-primary/30"
+              className={INPUT_CLASS}
               value={customMultiplier}
               onChange={(e) => setCustomMultiplier(e.target.value)}
               placeholder={`預設 ${currentPreset?.multiplier ?? 4}`}

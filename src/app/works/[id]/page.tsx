@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase";
+import { WORK_STATUS_LABELS } from "@/lib/constants";
 import type { Work, WorkThread, WorkTechnique } from "@/lib/types";
 
 export default function WorkDetailPage() {
@@ -42,13 +43,6 @@ export default function WorkDetailPage() {
     load();
   }, [params.id]);
 
-  const statusLabels: Record<string, string> = {
-    in_progress: "製作中",
-    completed: "已完成",
-    for_sale: "販售中",
-    sold: "已售出",
-  };
-
   if (loading)
     return <div className="text-center py-16 text-muted">載入中...</div>;
   if (!work)
@@ -72,7 +66,7 @@ export default function WorkDetailPage() {
         </div>
         <div className="flex items-center gap-3">
           <span className="px-3 py-1 rounded-full bg-primary/10 text-primary text-sm">
-            {statusLabels[work.status] ?? work.status}
+            {WORK_STATUS_LABELS[work.status] ?? work.status}
           </span>
           <Link
             href={`/works/${params.id}/edit`}

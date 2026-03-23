@@ -51,22 +51,16 @@ export default function Home() {
       </section>
 
       <section className="grid grid-cols-3 gap-6 text-center">
-        <div className="bg-card border border-border rounded-xl p-6">
-          <div className="text-3xl font-bold text-primary">{stats.works}</div>
-          <div className="text-muted mt-1">件作品</div>
-        </div>
-        <div className="bg-card border border-border rounded-xl p-6">
-          <div className="text-3xl font-bold text-primary">
-            {stats.clients}
+        {[
+          { value: stats.works, label: "件作品" },
+          { value: stats.clients, label: "位客戶" },
+          { value: stats.techniques, label: "種編法" },
+        ].map(({ value, label }) => (
+          <div key={label} className="bg-card border border-border rounded-xl p-6">
+            <div className="text-3xl font-bold text-primary">{value}</div>
+            <div className="text-muted mt-1">{label}</div>
           </div>
-          <div className="text-muted mt-1">位客戶</div>
-        </div>
-        <div className="bg-card border border-border rounded-xl p-6">
-          <div className="text-3xl font-bold text-primary">
-            {stats.techniques}
-          </div>
-          <div className="text-muted mt-1">種編法</div>
-        </div>
+        ))}
       </section>
 
       <section>

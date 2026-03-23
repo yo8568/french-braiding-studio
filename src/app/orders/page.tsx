@@ -2,6 +2,15 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase";
+import {
+  INPUT_CLASS,
+  ORDER_STATUS_LABELS,
+  ORDER_STATUS_COLORS,
+  SHIPPING_LABELS,
+  NOTE_TYPE_LABELS,
+  CONVENIENCE_STORES,
+} from "@/lib/constants";
+import { uploadImages } from "@/lib/upload";
 import type { Client, Order, OrderItem, Work, ClientNote } from "@/lib/types";
 
 export default function OrdersPage() {
@@ -154,16 +163,7 @@ export default function OrdersPage() {
   async function handleAddNote() {
     if (!noteForm || !noteForm.content.trim()) return;
 
-    const imageUrls: string[] = [];
-    for (const file of noteForm.images) {
-      const ext = file.name.split(".").pop();
-      const path = `notes/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-      const { error } = await supabase.storage.from("work-images").upload(path, file);
-      if (!error) {
-        const { data: { publicUrl } } = supabase.storage.from("work-images").getPublicUrl(path);
-        imageUrls.push(publicUrl);
-      }
-    }
+    const imageUrls = await uploadImages(noteForm.images, "notes/");
 
     await supabase.from("client_notes").insert({
       client_id: noteForm.clientId,
@@ -193,35 +193,6 @@ export default function OrdersPage() {
     setOrderNotes({ ...orderNotes, [orderId]: (data as ClientNote[]) ?? [] });
   }
 
-  const inputClass =
-    "w-full border border-border rounded-lg px-3 py-2 bg-card focus:outline-none focus:ring-2 focus:ring-primary/30";
-
-  const statusLabels: Record<string, string> = {
-    pending: "待出貨",
-    shipped: "已寄送",
-    delivered: "已送達",
-    cancelled: "已取消",
-  };
-
-  const statusColors: Record<string, string> = {
-    pending: "bg-yellow-100 text-yellow-800",
-    shipped: "bg-blue-100 text-blue-800",
-    delivered: "bg-green-100 text-green-800",
-    cancelled: "bg-red-100 text-red-800",
-  };
-
-  const shippingLabels: Record<string, string> = {
-    delivery: "宅配",
-    convenience_store: "超商取貨",
-  };
-
-  const noteTypeLabels: Record<string, string> = {
-    feedback: "回饋",
-    inquiry: "詢問",
-    communication: "溝通",
-    other: "其他",
-  };
-
   if (loading)
     return <div className="text-center py-16 text-muted">載入中...</div>;
 
@@ -250,7 +221,7 @@ export default function OrdersPage() {
               <label className="block text-sm font-medium mb-1">客戶 *</label>
               <select
                 required
-                className={inputClass}
+                className={INPUT_CLASS}
                 value={form.client_id}
                 onChange={(e) => handleClientChange(e.target.value)}
               >
@@ -266,7 +237,7 @@ export default function OrdersPage() {
             <div className="sm:col-span-2">
               <label className="block text-sm font-medium mb-1">運送方式</label>
               <select
-                className={inputClass}
+                className={INPUT_CLASS}
                 value={form.shipping_method}
                 onChange={(e) =>
                   setForm({ ...form, shipping_method: e.target.value as "" | "delivery" | "convenience_store" })
@@ -282,7 +253,7 @@ export default function OrdersPage() {
               <div className="sm:col-span-2">
                 <label className="block text-sm font-medium mb-1">宅配地址</label>
                 <input
-                  className={inputClass}
+                  className={INPUT_CLASS}
                   value={form.shipping_address}
                   onChange={(e) => setForm({ ...form, shipping_address: e.target.value })}
                 />
@@ -294,21 +265,20 @@ export default function OrdersPage() {
                 <div>
                   <label className="block text-sm font-medium mb-1">超商名稱</label>
                   <select
-                    className={inputClass}
+                    className={INPUT_CLASS}
                     value={form.store_name}
                     onChange={(e) => setForm({ ...form, store_name: e.target.value })}
                   >
                     <option value="">選擇超商</option>
-                    <option value="7-ELEVEN">7-ELEVEN</option>
-                    <option value="全家">全家</option>
-                    <option value="萊爾富">萊爾富</option>
-                    <option value="OK超商">OK超商</option>
+                    {CONVENIENCE_STORES.map((s) => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
                   </select>
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-1">門市</label>
                   <input
-                    className={inputClass}
+                    className={INPUT_CLASS}
                     value={form.store_branch}
                     onChange={(e) => setForm({ ...form, store_branch: e.target.value })}
                   />
@@ -319,7 +289,7 @@ export default function OrdersPage() {
             <div>
               <label className="block text-sm font-medium mb-1">狀態</label>
               <select
-                className={inputClass}
+                className={INPUT_CLASS}
                 value={form.status}
                 onChange={(e) => setForm({ ...form, status: e.target.value as Order["status"] })}
               >
@@ -333,7 +303,7 @@ export default function OrdersPage() {
             <div>
               <label className="block text-sm font-medium mb-1">備註</label>
               <input
-                className={inputClass}
+                className={INPUT_CLASS}
                 value={form.notes}
                 onChange={(e) => setForm({ ...form, notes: e.target.value })}
               />
@@ -355,7 +325,7 @@ export default function OrdersPage() {
             {orderItems.map((item, i) => (
               <div key={i} className="flex gap-2 items-center mb-2">
                 <select
-                  className={inputClass}
+                  className={INPUT_CLASS}
                   value={item.work_id}
                   onChange={(e) => handleWorkChange(i, e.target.value)}
                 >
@@ -444,8 +414,8 @@ export default function OrdersPage() {
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-3">
                       <span className="font-semibold">{order.client?.name ?? "未知客戶"}</span>
-                      <span className={`text-xs px-2 py-0.5 rounded-full ${statusColors[order.status]}`}>
-                        {statusLabels[order.status]}
+                      <span className={`text-xs px-2 py-0.5 rounded-full ${ORDER_STATUS_COLORS[order.status]}`}>
+                        {ORDER_STATUS_LABELS[order.status]}
                       </span>
                     </div>
                     <div className="flex items-center gap-2">
@@ -475,7 +445,7 @@ export default function OrdersPage() {
                     )}
                     {order.shipping_method && (
                       <span>
-                        {shippingLabels[order.shipping_method]}
+                        {SHIPPING_LABELS[order.shipping_method]}
                         {order.shipping_method === "delivery" && order.shipping_address && ` — ${order.shipping_address}`}
                         {order.shipping_method === "convenience_store" && (
                           <>
@@ -574,7 +544,7 @@ export default function OrdersPage() {
                       {noteForm?.orderId === order.id && (
                         <div className="bg-card border border-border rounded-lg p-3 mb-3 space-y-2">
                           <select
-                            className={inputClass}
+                            className={INPUT_CLASS}
                             value={noteForm.type}
                             onChange={(e) =>
                               setNoteForm({ ...noteForm, type: e.target.value as ClientNote["type"] })
@@ -586,7 +556,7 @@ export default function OrdersPage() {
                             <option value="other">其他</option>
                           </select>
                           <textarea
-                            className={inputClass}
+                            className={INPUT_CLASS}
                             rows={2}
                             value={noteForm.content}
                             onChange={(e) => setNoteForm({ ...noteForm, content: e.target.value })}
@@ -601,7 +571,7 @@ export default function OrdersPage() {
                               onChange={(e) =>
                                 setNoteForm({ ...noteForm, images: Array.from(e.target.files ?? []) })
                               }
-                              className={inputClass}
+                              className={INPUT_CLASS}
                             />
                           </div>
                           <div className="flex gap-2">
@@ -634,7 +604,7 @@ export default function OrdersPage() {
                                 <div className="flex-1 min-w-0">
                                   <div className="flex items-center gap-2 mb-1">
                                     <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary">
-                                      {noteTypeLabels[note.type] ?? note.type}
+                                      {NOTE_TYPE_LABELS[note.type] ?? note.type}
                                     </span>
                                     <span className="text-xs text-muted">
                                       {new Date(note.created_at).toLocaleDateString("zh-TW")}{" "}

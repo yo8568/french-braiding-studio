@@ -2,7 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase";
+import { WORK_STATUS_LABELS } from "@/lib/constants";
 import type { Work } from "@/lib/types";
+
+const filterLabels: Record<string, string> = { all: "全部", ...WORK_STATUS_LABELS };
 
 export default function WorksPage() {
   const [works, setWorks] = useState<Work[]>([]);
@@ -28,14 +31,6 @@ export default function WorksPage() {
     load();
   }, [filter]);
 
-  const statusLabels: Record<string, string> = {
-    all: "全部",
-    in_progress: "製作中",
-    completed: "已完成",
-    for_sale: "販售中",
-    sold: "已售出",
-  };
-
   return (
     <div>
       <div className="flex items-center justify-between mb-8">
@@ -49,7 +44,7 @@ export default function WorksPage() {
       </div>
 
       <div className="flex gap-2 mb-6">
-        {Object.entries(statusLabels).map(([key, label]) => (
+        {Object.entries(filterLabels).map(([key, label]) => (
           <button
             key={key}
             onClick={() => setFilter(key)}
@@ -89,7 +84,7 @@ export default function WorksPage() {
                 <div className="flex items-center justify-between">
                   <h3 className="font-semibold">{work.name}</h3>
                   <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary">
-                    {statusLabels[work.status] ?? work.status}
+                    {WORK_STATUS_LABELS[work.status] ?? work.status}
                   </span>
                 </div>
                 <p className="text-sm text-muted mt-1">

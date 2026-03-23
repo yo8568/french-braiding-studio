@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase";
+import { INPUT_CLASS } from "@/lib/constants";
 import type { Thread } from "@/lib/types";
 
 export default function ThreadsPage() {
@@ -83,11 +84,12 @@ export default function ThreadsPage() {
   }
 
   function downloadCsvTemplate() {
-    const header = "color_name,color_hex,material,thickness_mm,source";
-    const example1 = "酒紅色,#8B0000,蠟線,0.8,蝦皮";
-    const example2 = "天藍色,#87CEEB,棉線,1.0,手藝材料行";
-    const example3 = "金色,#FFD700,尼龍,0.5,";
-    const csv = [header, example1, example2, example3].join("\n");
+    const csv = [
+      "color_name,color_hex,material,thickness_mm,source",
+      "酒紅色,#8B0000,蠟線,0.8,蝦皮",
+      "天藍色,#87CEEB,棉線,1.0,手藝材料行",
+      "金色,#FFD700,尼龍,0.5,",
+    ].join("\n");
     const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -158,9 +160,6 @@ export default function ThreadsPage() {
     }
   }
 
-  const inputClass =
-    "w-full border border-border rounded-lg px-3 py-2 bg-card focus:outline-none focus:ring-2 focus:ring-primary/30";
-
   if (loading)
     return <div className="text-center py-16 text-muted">載入中...</div>;
 
@@ -218,7 +217,7 @@ export default function ThreadsPage() {
               type="file"
               accept=".csv"
               onChange={(e) => setCsvFile(e.target.files?.[0] ?? null)}
-              className={inputClass}
+              className={INPUT_CLASS}
             />
           </div>
           {csvResult && (
@@ -264,7 +263,7 @@ export default function ThreadsPage() {
               <label className="block text-sm font-medium mb-1">顏色名稱 *</label>
               <input
                 required
-                className={inputClass}
+                className={INPUT_CLASS}
                 value={form.color_name}
                 onChange={(e) => setForm({ ...form, color_name: e.target.value })}
                 placeholder="例：酒紅色"
@@ -285,7 +284,7 @@ export default function ThreadsPage() {
             <div>
               <label className="block text-sm font-medium mb-1">材質</label>
               <input
-                className={inputClass}
+                className={INPUT_CLASS}
                 value={form.material}
                 onChange={(e) => setForm({ ...form, material: e.target.value })}
                 placeholder="例：蠟線、棉線、尼龍"
@@ -296,7 +295,7 @@ export default function ThreadsPage() {
               <input
                 type="number"
                 step="0.1"
-                className={inputClass}
+                className={INPUT_CLASS}
                 value={form.thickness_mm}
                 onChange={(e) => setForm({ ...form, thickness_mm: e.target.value })}
                 placeholder="例：0.8"
@@ -305,7 +304,7 @@ export default function ThreadsPage() {
             <div className="sm:col-span-2">
               <label className="block text-sm font-medium mb-1">來源</label>
               <input
-                className={inputClass}
+                className={INPUT_CLASS}
                 value={form.source}
                 onChange={(e) => setForm({ ...form, source: e.target.value })}
                 placeholder="例：蝦皮、手藝材料行、朋友送的"

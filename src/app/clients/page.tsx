@@ -2,6 +2,14 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase";
+import {
+  INPUT_CLASS,
+  WORK_STATUS_LABELS,
+  SHIPPING_LABELS,
+  NOTE_TYPE_LABELS,
+  CONVENIENCE_STORES,
+} from "@/lib/constants";
+import { uploadImages } from "@/lib/upload";
 import type { Client, ClientNote, Work } from "@/lib/types";
 
 export default function ClientsPage() {
@@ -29,6 +37,14 @@ export default function ClientsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  function groupBy<T extends { client_id: string }>(items: T[]): Record<string, T[]> {
+    const map: Record<string, T[]> = {};
+    for (const item of items) {
+      (map[item.client_id] ??= []).push(item);
+    }
+    return map;
+  }
+
   async function loadClients() {
     const { data } = await supabase
       .from("clients")
@@ -37,38 +53,14 @@ export default function ClientsPage() {
     const clientList = (data as Client[]) ?? [];
     setClients(clientList);
 
-    // Load works for all clients
     if (clientList.length > 0) {
       const ids = clientList.map((c) => c.id);
-      const { data: works } = await supabase
-        .from("works")
-        .select("*")
-        .in("client_id", ids)
-        .order("created_at", { ascending: false });
-
-      const grouped: Record<string, Work[]> = {};
-      for (const w of (works as Work[]) ?? []) {
-        if (!grouped[w.client_id]) grouped[w.client_id] = [];
-        grouped[w.client_id].push(w);
-      }
-      setClientWorks(grouped);
-    }
-
-    // Load notes for all clients
-    if (clientList.length > 0) {
-      const ids = clientList.map((c) => c.id);
-      const { data: notes } = await supabase
-        .from("client_notes")
-        .select("*")
-        .in("client_id", ids)
-        .order("created_at", { ascending: false });
-
-      const groupedNotes: Record<string, ClientNote[]> = {};
-      for (const n of (notes as ClientNote[]) ?? []) {
-        if (!groupedNotes[n.client_id]) groupedNotes[n.client_id] = [];
-        groupedNotes[n.client_id].push(n);
-      }
-      setClientNotes(groupedNotes);
+      const [worksRes, notesRes] = await Promise.all([
+        supabase.from("works").select("*").in("client_id", ids).order("created_at", { ascending: false }),
+        supabase.from("client_notes").select("*").in("client_id", ids).order("created_at", { ascending: false }),
+      ]);
+      setClientWorks(groupBy((worksRes.data as Work[]) ?? []));
+      setClientNotes(groupBy((notesRes.data as ClientNote[]) ?? []));
     }
 
     setLoading(false);
@@ -77,17 +69,7 @@ export default function ClientsPage() {
   async function handleAddNote() {
     if (!noteForm || !noteForm.content.trim()) return;
 
-    // Upload images
-    const imageUrls: string[] = [];
-    for (const file of noteForm.images) {
-      const ext = file.name.split(".").pop();
-      const path = `notes/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-      const { error } = await supabase.storage.from("work-images").upload(path, file);
-      if (!error) {
-        const { data: { publicUrl } } = supabase.storage.from("work-images").getPublicUrl(path);
-        imageUrls.push(publicUrl);
-      }
-    }
+    const imageUrls = await uploadImages(noteForm.images, "notes/");
 
     await supabase.from("client_notes").insert({
       client_id: noteForm.clientId,
@@ -162,28 +144,6 @@ export default function ClientsPage() {
     loadClients();
   }
 
-  const inputClass =
-    "w-full border border-border rounded-lg px-3 py-2 bg-card focus:outline-none focus:ring-2 focus:ring-primary/30";
-
-  const shippingLabels: Record<string, string> = {
-    delivery: "宅配",
-    convenience_store: "超商取貨",
-  };
-
-  const noteTypeLabels: Record<string, string> = {
-    feedback: "回饋",
-    inquiry: "詢問",
-    communication: "溝通",
-    other: "其他",
-  };
-
-  const statusLabels: Record<string, string> = {
-    in_progress: "製作中",
-    completed: "已完成",
-    for_sale: "販售中",
-    sold: "已售出",
-  };
-
   if (loading)
     return <div className="text-center py-16 text-muted">載入中...</div>;
 
@@ -216,7 +176,7 @@ export default function ClientsPage() {
               <label className="block text-sm font-medium mb-1">姓名 *</label>
               <input
                 required
-                className={inputClass}
+                className={INPUT_CLASS}
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
                 placeholder="客戶姓名"
@@ -225,7 +185,7 @@ export default function ClientsPage() {
             <div>
               <label className="block text-sm font-medium mb-1">電話</label>
               <input
-                className={inputClass}
+                className={INPUT_CLASS}
                 value={form.phone}
                 onChange={(e) => setForm({ ...form, phone: e.target.value })}
                 placeholder="0912-345-678"
@@ -234,7 +194,7 @@ export default function ClientsPage() {
             <div className="sm:col-span-2">
               <label className="block text-sm font-medium mb-1">運送方式</label>
               <select
-                className={inputClass}
+                className={INPUT_CLASS}
                 value={form.shipping_method}
                 onChange={(e) =>
                   setForm({
@@ -253,7 +213,7 @@ export default function ClientsPage() {
               <div className="sm:col-span-2">
                 <label className="block text-sm font-medium mb-1">宅配地址</label>
                 <input
-                  className={inputClass}
+                  className={INPUT_CLASS}
                   value={form.shipping_address}
                   onChange={(e) => setForm({ ...form, shipping_address: e.target.value })}
                   placeholder="台北市信義區..."
@@ -266,21 +226,20 @@ export default function ClientsPage() {
                 <div>
                   <label className="block text-sm font-medium mb-1">超商名稱</label>
                   <select
-                    className={inputClass}
+                    className={INPUT_CLASS}
                     value={form.store_name}
                     onChange={(e) => setForm({ ...form, store_name: e.target.value })}
                   >
                     <option value="">選擇超商</option>
-                    <option value="7-ELEVEN">7-ELEVEN</option>
-                    <option value="全家">全家</option>
-                    <option value="萊爾富">萊爾富</option>
-                    <option value="OK超商">OK超商</option>
+                    {CONVENIENCE_STORES.map((s) => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
                   </select>
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-1">門市名稱</label>
                   <input
-                    className={inputClass}
+                    className={INPUT_CLASS}
                     value={form.store_branch}
                     onChange={(e) => setForm({ ...form, store_branch: e.target.value })}
                     placeholder="例：信義門市"
@@ -292,7 +251,7 @@ export default function ClientsPage() {
             <div className="sm:col-span-2">
               <label className="block text-sm font-medium mb-1">備註</label>
               <textarea
-                className={inputClass}
+                className={INPUT_CLASS}
                 rows={2}
                 value={form.bio}
                 onChange={(e) => setForm({ ...form, bio: e.target.value })}
@@ -344,7 +303,7 @@ export default function ClientsPage() {
                     <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1 text-sm text-muted">
                       {client.shipping_method && (
                         <span>
-                          {shippingLabels[client.shipping_method] ?? client.shipping_method}
+                          {SHIPPING_LABELS[client.shipping_method] ?? client.shipping_method}
                           {client.shipping_method === "delivery" && client.shipping_address && (
                             <> — {client.shipping_address}</>
                           )}
@@ -410,7 +369,7 @@ export default function ClientsPage() {
                                 <div>
                                   <span className="font-medium text-sm">{work.name}</span>
                                   <span className="text-xs text-muted ml-2">
-                                    {statusLabels[work.status] ?? work.status}
+                                    {WORK_STATUS_LABELS[work.status] ?? work.status}
                                   </span>
                                 </div>
                               </div>
@@ -452,7 +411,7 @@ export default function ClientsPage() {
                       {noteForm?.clientId === client.id && (
                         <div className="bg-card border border-border rounded-lg p-3 mb-3 space-y-2">
                           <select
-                            className={inputClass}
+                            className={INPUT_CLASS}
                             value={noteForm.type}
                             onChange={(e) =>
                               setNoteForm({ ...noteForm, type: e.target.value as ClientNote["type"] })
@@ -464,7 +423,7 @@ export default function ClientsPage() {
                             <option value="other">其他</option>
                           </select>
                           <textarea
-                            className={inputClass}
+                            className={INPUT_CLASS}
                             rows={2}
                             value={noteForm.content}
                             onChange={(e) => setNoteForm({ ...noteForm, content: e.target.value })}
@@ -479,7 +438,7 @@ export default function ClientsPage() {
                               onChange={(e) =>
                                 setNoteForm({ ...noteForm, images: Array.from(e.target.files ?? []) })
                               }
-                              className={inputClass}
+                              className={INPUT_CLASS}
                             />
                             {noteForm.images.length > 0 && (
                               <p className="text-xs text-muted mt-1">已選擇 {noteForm.images.length} 張圖片</p>
@@ -515,7 +474,7 @@ export default function ClientsPage() {
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-2 mb-1">
                                   <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary">
-                                    {noteTypeLabels[note.type] ?? note.type}
+                                    {NOTE_TYPE_LABELS[note.type] ?? note.type}
                                   </span>
                                   <span className="text-xs text-muted">
                                     {new Date(note.created_at).toLocaleDateString("zh-TW")}{" "}
