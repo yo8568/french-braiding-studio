@@ -17,6 +17,10 @@ export default function ThreadsPage() {
     thickness_mm: "",
     source: "",
   });
+  const [showCsvUpload, setShowCsvUpload] = useState(false);
+  const [csvFile, setCsvFile] = useState<File | null>(null);
+  const [csvUploading, setCsvUploading] = useState(false);
+  const [csvResult, setCsvResult] = useState<string | null>(null);
 
   useEffect(() => {
     loadThreads();
@@ -78,6 +82,82 @@ export default function ThreadsPage() {
     loadThreads();
   }
 
+  function downloadCsvTemplate() {
+    const header = "color_name,color_hex,material,thickness_mm,source";
+    const example1 = "酒紅色,#8B0000,蠟線,0.8,蝦皮";
+    const example2 = "天藍色,#87CEEB,棉線,1.0,手藝材料行";
+    const example3 = "金色,#FFD700,尼龍,0.5,";
+    const csv = [header, example1, example2, example3].join("\n");
+    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "threads_template.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  async function handleCsvUpload() {
+    if (!csvFile) return;
+    setCsvUploading(true);
+    setCsvResult(null);
+
+    try {
+      const text = await csvFile.text();
+      const lines = text.trim().split("\n");
+      if (lines.length < 2) {
+        setCsvResult("CSV 檔案至少需要標題列和一行資料");
+        return;
+      }
+
+      const headers = lines[0].split(",").map((h) => h.trim().replace(/^"|"$/g, ""));
+      const nameIdx = headers.indexOf("color_name");
+      const hexIdx = headers.indexOf("color_hex");
+      const materialIdx = headers.indexOf("material");
+      const thicknessIdx = headers.indexOf("thickness_mm");
+      const sourceIdx = headers.indexOf("source");
+
+      if (nameIdx === -1) {
+        setCsvResult("CSV 缺少 color_name 欄位");
+        return;
+      }
+
+      const rows = [];
+      for (let i = 1; i < lines.length; i++) {
+        const cols = lines[i].split(",").map((c) => c.trim().replace(/^"|"$/g, ""));
+        const colorName = cols[nameIdx];
+        if (!colorName) continue;
+
+        rows.push({
+          color_name: colorName,
+          color_hex: hexIdx !== -1 && cols[hexIdx] ? cols[hexIdx] : "#000000",
+          material: materialIdx !== -1 && cols[materialIdx] ? cols[materialIdx] : null,
+          thickness_mm: thicknessIdx !== -1 && cols[thicknessIdx] ? parseFloat(cols[thicknessIdx]) || null : null,
+          source: sourceIdx !== -1 && cols[sourceIdx] ? cols[sourceIdx] : null,
+        });
+      }
+
+      if (rows.length === 0) {
+        setCsvResult("沒有有效的資料行");
+        return;
+      }
+
+      const { error } = await supabase.from("threads").insert(rows);
+      if (error) {
+        setCsvResult(`匯入失敗: ${error.message}`);
+      } else {
+        setCsvResult(`成功匯入 ${rows.length} 筆線材`);
+        setCsvFile(null);
+        setShowCsvUpload(false);
+        loadThreads();
+      }
+    } catch {
+      setCsvResult("CSV 解析失敗，請確認格式");
+    } finally {
+      setCsvUploading(false);
+    }
+  }
+
   const inputClass =
     "w-full border border-border rounded-lg px-3 py-2 bg-card focus:outline-none focus:ring-2 focus:ring-primary/30";
 
@@ -88,16 +168,87 @@ export default function ThreadsPage() {
     <div className="max-w-4xl mx-auto">
       <div className="flex items-center justify-between mb-8">
         <h1 className="text-3xl font-bold">線材管理</h1>
-        <button
-          onClick={() => {
-            resetForm();
-            setShowForm(true);
-          }}
-          className="bg-primary text-white px-4 py-2 rounded-lg hover:bg-accent transition-colors"
-        >
-          + 新增線材
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => {
+              setShowCsvUpload(!showCsvUpload);
+              setShowForm(false);
+            }}
+            className="border border-primary text-primary px-4 py-2 rounded-lg hover:bg-primary/10 transition-colors"
+          >
+            CSV 匯入
+          </button>
+          <button
+            onClick={() => {
+              resetForm();
+              setShowForm(true);
+              setShowCsvUpload(false);
+            }}
+            className="bg-primary text-white px-4 py-2 rounded-lg hover:bg-accent transition-colors"
+          >
+            + 新增線材
+          </button>
+        </div>
       </div>
+
+      {/* CSV Upload */}
+      {showCsvUpload && (
+        <div className="bg-card border border-border rounded-xl p-6 mb-8 space-y-4">
+          <h2 className="text-xl font-semibold text-primary">CSV 批次匯入</h2>
+          <div className="text-sm text-muted space-y-1">
+            <p>CSV 格式：每行一筆線材，第一行為標題列。</p>
+            <p>必填欄位：<code className="bg-background px-1 rounded">color_name</code></p>
+            <p>
+              選填欄位：
+              <code className="bg-background px-1 rounded">color_hex</code>、
+              <code className="bg-background px-1 rounded">material</code>、
+              <code className="bg-background px-1 rounded">thickness_mm</code>、
+              <code className="bg-background px-1 rounded">source</code>
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={downloadCsvTemplate}
+            className="text-sm text-primary hover:text-accent underline"
+          >
+            下載 CSV 範例檔案
+          </button>
+          <div>
+            <input
+              type="file"
+              accept=".csv"
+              onChange={(e) => setCsvFile(e.target.files?.[0] ?? null)}
+              className={inputClass}
+            />
+          </div>
+          {csvResult && (
+            <p className={`text-sm ${csvResult.includes("成功") ? "text-green-600" : "text-red-500"}`}>
+              {csvResult}
+            </p>
+          )}
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={handleCsvUpload}
+              disabled={!csvFile || csvUploading}
+              className="bg-primary text-white px-6 py-2 rounded-lg hover:bg-accent transition-colors disabled:opacity-50"
+            >
+              {csvUploading ? "匯入中..." : "開始匯入"}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setShowCsvUpload(false);
+                setCsvFile(null);
+                setCsvResult(null);
+              }}
+              className="border border-border px-6 py-2 rounded-lg hover:bg-card transition-colors"
+            >
+              取消
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Form */}
       {showForm && (
