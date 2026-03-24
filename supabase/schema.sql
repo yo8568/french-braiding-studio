@@ -61,6 +61,11 @@ CREATE TABLE techniques (
   name TEXT NOT NULL UNIQUE,
   description TEXT,
   difficulty INTEGER DEFAULT 1 CHECK (difficulty BETWEEN 1 AND 5),
+  cord_count INTEGER NOT NULL DEFAULT 3,
+  knot_length_cm DECIMAL(10, 2),
+  cord1_multiplier DECIMAL(4, 2),
+  cord2_multiplier DECIMAL(4, 2),
+  cord3_multiplier DECIMAL(4, 2),
   created_at TIMESTAMPTZ DEFAULT now()
 );
 

@@ -99,6 +99,11 @@ export interface Technique {
   name: string;
   description?: string;
   difficulty: number; // 1-5
+  cord_count: number;
+  knot_length_cm?: number;
+  cord1_multiplier?: number;
+  cord2_multiplier?: number;
+  cord3_multiplier?: number;
   created_at: string;
 }
 

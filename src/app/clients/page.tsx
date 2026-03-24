@@ -6,9 +6,7 @@ import { createClient } from "@/lib/supabase";
 import {
   INPUT_CLASS,
   WORK_STATUS_LABELS,
-  SHIPPING_LABELS,
   NOTE_TYPE_LABELS,
-  CONVENIENCE_STORES,
   SOCIAL_MEDIA_LABELS,
 } from "@/lib/constants";
 import { uploadImages } from "@/lib/upload";
@@ -32,10 +30,7 @@ export default function ClientsPage() {
     social_media_type: "ig" as "ig" | "line" | "fb",
     social_media_id: "",
     phone: "",
-    shipping_method: "" as "" | "delivery" | "convenience_store",
-    shipping_address: "",
-    store_name: "",
-    store_branch: "",
+    shipping_method: "",
     bio: "",
   });
 
@@ -99,9 +94,6 @@ export default function ClientsPage() {
       social_media_id: "",
       phone: "",
       shipping_method: "",
-      shipping_address: "",
-      store_name: "",
-      store_branch: "",
       bio: "",
     });
     setEditingId(null);
@@ -115,9 +107,6 @@ export default function ClientsPage() {
       social_media_id: client.social_media_id ?? "",
       phone: client.phone ?? "",
       shipping_method: client.shipping_method ?? "",
-      shipping_address: client.shipping_address ?? "",
-      store_name: client.store_name ?? "",
-      store_branch: client.store_branch ?? "",
       bio: client.bio ?? "",
     });
     setEditingId(client.id);
@@ -134,9 +123,6 @@ export default function ClientsPage() {
       social_media_id: form.social_media_id || null,
       phone: form.phone || null,
       shipping_method: form.shipping_method || null,
-      shipping_address: form.shipping_method === "delivery" ? (form.shipping_address || null) : null,
-      store_name: form.shipping_method === "convenience_store" ? (form.store_name || null) : null,
-      store_branch: form.shipping_method === "convenience_store" ? (form.store_branch || null) : null,
       bio: form.bio || null,
     };
 
@@ -221,60 +207,13 @@ export default function ClientsPage() {
             </div>
             <div className="sm:col-span-2">
               <label className="block text-sm font-medium mb-1">運送方式</label>
-              <select
+              <input
                 className={INPUT_CLASS}
                 value={form.shipping_method}
-                onChange={(e) =>
-                  setForm({
-                    ...form,
-                    shipping_method: e.target.value as "" | "delivery" | "convenience_store",
-                  })
-                }
-              >
-                <option value="">未設定</option>
-                <option value="delivery">宅配</option>
-                <option value="convenience_store">超商取貨</option>
-              </select>
+                onChange={(e) => setForm({ ...form, shipping_method: e.target.value })}
+                placeholder="例：宅配、超商取貨、面交"
+              />
             </div>
-
-            {form.shipping_method === "delivery" && (
-              <div className="sm:col-span-2">
-                <label className="block text-sm font-medium mb-1">宅配地址</label>
-                <input
-                  className={INPUT_CLASS}
-                  value={form.shipping_address}
-                  onChange={(e) => setForm({ ...form, shipping_address: e.target.value })}
-                  placeholder="台北市信義區..."
-                />
-              </div>
-            )}
-
-            {form.shipping_method === "convenience_store" && (
-              <>
-                <div>
-                  <label className="block text-sm font-medium mb-1">超商名稱</label>
-                  <select
-                    className={INPUT_CLASS}
-                    value={form.store_name}
-                    onChange={(e) => setForm({ ...form, store_name: e.target.value })}
-                  >
-                    <option value="">選擇超商</option>
-                    {CONVENIENCE_STORES.map((s) => (
-                      <option key={s} value={s}>{s}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">門市名稱</label>
-                  <input
-                    className={INPUT_CLASS}
-                    value={form.store_branch}
-                    onChange={(e) => setForm({ ...form, store_branch: e.target.value })}
-                    placeholder="例：信義門市"
-                  />
-                </div>
-              </>
-            )}
 
             <div className="sm:col-span-2">
               <label className="block text-sm font-medium mb-1">備註</label>
@@ -346,18 +285,7 @@ export default function ClientsPage() {
                     </div>
                     <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1 text-sm text-muted">
                       {client.shipping_method && (
-                        <span>
-                          {SHIPPING_LABELS[client.shipping_method] ?? client.shipping_method}
-                          {client.shipping_method === "delivery" && client.shipping_address && (
-                            <> — {client.shipping_address}</>
-                          )}
-                          {client.shipping_method === "convenience_store" && (
-                            <>
-                              {client.store_name && <> — {client.store_name}</>}
-                              {client.store_branch && <> {client.store_branch}</>}
-                            </>
-                          )}
-                        </span>
+                        <span>{client.shipping_method}</span>
                       )}
                       {client.bio && <span>{client.bio}</span>}
                     </div>

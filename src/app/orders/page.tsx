@@ -7,9 +7,7 @@ import {
   INPUT_CLASS,
   ORDER_STATUS_LABELS,
   ORDER_STATUS_COLORS,
-  SHIPPING_LABELS,
   NOTE_TYPE_LABELS,
-  CONVENIENCE_STORES,
 } from "@/lib/constants";
 import { uploadImages } from "@/lib/upload";
 import type { Client, Order, OrderItem, Work, ClientNote } from "@/lib/types";
@@ -36,13 +34,12 @@ export default function OrdersPage() {
 
   const [form, setForm] = useState({
     client_id: "",
-    shipping_method: "" as "" | "delivery" | "convenience_store",
-    shipping_address: "",
-    store_name: "",
-    store_branch: "",
+    client_input: "",
+    shipping_method: "",
     notes: "",
     status: "pending" as Order["status"],
   });
+  const [newClientCreated, setNewClientCreated] = useState(false);
   const [orderItems, setOrderItems] = useState<{ work_id: string; price: string; quantity: string }[]>([
     { work_id: "", price: "", quantity: "1" },
   ]);
@@ -66,17 +63,27 @@ export default function OrdersPage() {
     setLoading(false);
   }
 
-  // Auto-fill shipping from client
-  function handleClientChange(clientId: string) {
+  // Auto-fill from client's latest order, fallback to client info
+  function handleClientSelect(clientId: string) {
     const client = clients.find((c) => c.id === clientId);
+    const latestOrder = orders.find((o) => o.client_id === clientId);
     setForm({
       ...form,
       client_id: clientId,
-      shipping_method: client?.shipping_method ?? "",
-      shipping_address: client?.shipping_address ?? "",
-      store_name: client?.store_name ?? "",
-      store_branch: client?.store_branch ?? "",
+      client_input: client?.name ?? "",
+      shipping_method: latestOrder?.shipping_method ?? client?.shipping_method ?? "",
+      notes: latestOrder?.notes ?? "",
     });
+    if (latestOrder?.order_items?.length) {
+      setOrderItems(
+        latestOrder.order_items.map((item) => ({
+          work_id: item.work_id,
+          price: item.price.toString(),
+          quantity: item.quantity.toString(),
+        }))
+      );
+    }
+    setNewClientCreated(false);
   }
 
   // Auto-fill price from work
@@ -90,7 +97,24 @@ export default function OrdersPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!form.client_id) return;
+    if (!form.client_id && !form.client_input.trim()) return;
+
+    let clientId = form.client_id;
+
+    // If no existing client selected, create a new one
+    if (!clientId && form.client_input.trim()) {
+      const { data: newClient, error: clientErr } = await supabase
+        .from("clients")
+        .insert({ name: form.client_input.trim() })
+        .select()
+        .single();
+      if (clientErr || !newClient) {
+        alert("建立客戶失敗");
+        return;
+      }
+      clientId = newClient.id;
+      setNewClientCreated(true);
+    }
 
     const items = orderItems.filter((i) => i.work_id);
     const totalAmount = items.reduce(
@@ -101,11 +125,8 @@ export default function OrdersPage() {
     const { data: order, error } = await supabase
       .from("orders")
       .insert({
-        client_id: form.client_id,
+        client_id: clientId,
         shipping_method: form.shipping_method || null,
-        shipping_address: form.shipping_method === "delivery" ? (form.shipping_address || null) : null,
-        store_name: form.shipping_method === "convenience_store" ? (form.store_name || null) : null,
-        store_branch: form.shipping_method === "convenience_store" ? (form.store_branch || null) : null,
         total_amount: totalAmount || null,
         status: form.status,
         notes: form.notes || null,
@@ -129,18 +150,21 @@ export default function OrdersPage() {
       );
     }
 
+    const isNew = newClientCreated || (!form.client_id && form.client_input.trim());
     setShowForm(false);
     setForm({
       client_id: "",
+      client_input: "",
       shipping_method: "",
-      shipping_address: "",
-      store_name: "",
-      store_branch: "",
       notes: "",
       status: "pending",
     });
+    setNewClientCreated(false);
     setOrderItems([{ work_id: "", price: "", quantity: "1" }]);
     loadAll();
+    if (isNew) {
+      alert("已自動新增客戶，請至客戶管理填寫完整資料（社群帳號、運送方式等）");
+    }
   }
 
   async function handleStatusChange(orderId: string, status: Order["status"]) {
@@ -217,72 +241,45 @@ export default function OrdersPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="sm:col-span-2">
               <label className="block text-sm font-medium mb-1">客戶 *</label>
-              <select
+              <input
                 required
                 className={INPUT_CLASS}
-                value={form.client_id}
-                onChange={(e) => handleClientChange(e.target.value)}
-              >
-                <option value="">選擇客戶</option>
+                list="client-list"
+                value={form.client_input}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  const match = clients.find((c) => c.name === value);
+                  if (match) {
+                    handleClientSelect(match.id);
+                  } else {
+                    setForm({ ...form, client_input: value, client_id: "" });
+                  }
+                }}
+                placeholder="選擇或輸入新客戶名稱"
+              />
+              <datalist id="client-list">
                 {clients.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name} {c.phone ? `(${c.phone})` : ""}
+                  <option key={c.id} value={c.name}>
+                    {c.phone ? `(${c.phone})` : ""}
                   </option>
                 ))}
-              </select>
+              </datalist>
+              {!form.client_id && form.client_input.trim() && (
+                <p className="text-xs text-yellow-600 mt-1">
+                  將自動建立新客戶「{form.client_input.trim()}」
+                </p>
+              )}
             </div>
 
             <div className="sm:col-span-2">
               <label className="block text-sm font-medium mb-1">運送方式</label>
-              <select
+              <input
                 className={INPUT_CLASS}
                 value={form.shipping_method}
-                onChange={(e) =>
-                  setForm({ ...form, shipping_method: e.target.value as "" | "delivery" | "convenience_store" })
-                }
-              >
-                <option value="">未設定</option>
-                <option value="delivery">宅配</option>
-                <option value="convenience_store">超商取貨</option>
-              </select>
+                onChange={(e) => setForm({ ...form, shipping_method: e.target.value })}
+                placeholder="例：宅配、超商取貨、面交"
+              />
             </div>
-
-            {form.shipping_method === "delivery" && (
-              <div className="sm:col-span-2">
-                <label className="block text-sm font-medium mb-1">宅配地址</label>
-                <input
-                  className={INPUT_CLASS}
-                  value={form.shipping_address}
-                  onChange={(e) => setForm({ ...form, shipping_address: e.target.value })}
-                />
-              </div>
-            )}
-
-            {form.shipping_method === "convenience_store" && (
-              <>
-                <div>
-                  <label className="block text-sm font-medium mb-1">超商名稱</label>
-                  <select
-                    className={INPUT_CLASS}
-                    value={form.store_name}
-                    onChange={(e) => setForm({ ...form, store_name: e.target.value })}
-                  >
-                    <option value="">選擇超商</option>
-                    {CONVENIENCE_STORES.map((s) => (
-                      <option key={s} value={s}>{s}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">門市</label>
-                  <input
-                    className={INPUT_CLASS}
-                    value={form.store_branch}
-                    onChange={(e) => setForm({ ...form, store_branch: e.target.value })}
-                  />
-                </div>
-              </>
-            )}
 
             <div>
               <label className="block text-sm font-medium mb-1">狀態</label>
@@ -442,16 +439,7 @@ export default function OrdersPage() {
                       <span className="text-primary font-medium">NT${order.total_amount.toLocaleString()}</span>
                     )}
                     {order.shipping_method && (
-                      <span>
-                        {SHIPPING_LABELS[order.shipping_method]}
-                        {order.shipping_method === "delivery" && order.shipping_address && ` — ${order.shipping_address}`}
-                        {order.shipping_method === "convenience_store" && (
-                          <>
-                            {order.store_name && ` — ${order.store_name}`}
-                            {order.store_branch && ` ${order.store_branch}`}
-                          </>
-                        )}
-                      </span>
+                      <span>{order.shipping_method}</span>
                     )}
                     {order.notes && <span>{order.notes}</span>}
                   </div>
