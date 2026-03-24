@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { usePageShow } from "@/lib/usePageShow";
 import { createClient } from "@/lib/supabase";
 import {
   INPUT_CLASS,
@@ -8,9 +9,11 @@ import {
   SHIPPING_LABELS,
   NOTE_TYPE_LABELS,
   CONVENIENCE_STORES,
+  SOCIAL_MEDIA_LABELS,
 } from "@/lib/constants";
 import { uploadImages } from "@/lib/upload";
 import type { Client, ClientNote, Work } from "@/lib/types";
+import Modal from "@/app/components/Modal";
 
 export default function ClientsPage() {
   const supabase = createClient();
@@ -24,6 +27,8 @@ export default function ClientsPage() {
   const [noteForm, setNoteForm] = useState<{ clientId: string; type: ClientNote["type"]; content: string; images: File[] } | null>(null);
   const [form, setForm] = useState({
     name: "",
+    social_media_type: "ig" as "ig" | "line" | "fb",
+    social_media_id: "",
     phone: "",
     shipping_method: "" as "" | "delivery" | "convenience_store",
     shipping_address: "",
@@ -32,10 +37,9 @@ export default function ClientsPage() {
     bio: "",
   });
 
-  useEffect(() => {
+  usePageShow(() => {
     loadClients();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  });
 
   function groupBy<T extends { client_id: string }>(items: T[]): Record<string, T[]> {
     const map: Record<string, T[]> = {};
@@ -89,6 +93,8 @@ export default function ClientsPage() {
   function resetForm() {
     setForm({
       name: "",
+      social_media_type: "ig",
+      social_media_id: "",
       phone: "",
       shipping_method: "",
       shipping_address: "",
@@ -103,6 +109,8 @@ export default function ClientsPage() {
   function handleEdit(client: Client) {
     setForm({
       name: client.name,
+      social_media_type: client.social_media_type ?? "ig",
+      social_media_id: client.social_media_id ?? "",
       phone: client.phone ?? "",
       shipping_method: client.shipping_method ?? "",
       shipping_address: client.shipping_address ?? "",
@@ -120,6 +128,8 @@ export default function ClientsPage() {
 
     const payload = {
       name: form.name.trim(),
+      social_media_type: form.social_media_type,
+      social_media_id: form.social_media_id || null,
       phone: form.phone || null,
       shipping_method: form.shipping_method || null,
       shipping_address: form.shipping_method === "delivery" ? (form.shipping_address || null) : null,
@@ -162,15 +172,9 @@ export default function ClientsPage() {
         </button>
       </div>
 
-      {/* Form */}
-      {showForm && (
-        <form
-          onSubmit={handleSubmit}
-          className="bg-card border border-border rounded-xl p-6 mb-8 space-y-4"
-        >
-          <h2 className="text-xl font-semibold text-primary">
-            {editingId ? "編輯客戶" : "新增客戶"}
-          </h2>
+      {/* Form Modal */}
+      <Modal open={showForm} onClose={resetForm} title={editingId ? "編輯客戶" : "新增客戶"}>
+        <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium mb-1">姓名 *</label>
@@ -181,6 +185,28 @@ export default function ClientsPage() {
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
                 placeholder="客戶姓名"
               />
+            </div>
+            <div className="sm:col-span-2">
+              <label className="block text-sm font-medium mb-1">社群平台</label>
+              <div className="grid grid-cols-[auto_1fr] gap-2">
+                <select
+                  className={INPUT_CLASS}
+                  value={form.social_media_type}
+                  onChange={(e) =>
+                    setForm({ ...form, social_media_type: e.target.value as "ig" | "line" | "fb" })
+                  }
+                >
+                  {Object.entries(SOCIAL_MEDIA_LABELS).map(([key, label]) => (
+                    <option key={key} value={key}>{label}</option>
+                  ))}
+                </select>
+                <input
+                  className={INPUT_CLASS}
+                  value={form.social_media_id}
+                  onChange={(e) => setForm({ ...form, social_media_id: e.target.value })}
+                  placeholder="帳號 ID"
+                />
+              </div>
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">電話</label>
@@ -275,7 +301,7 @@ export default function ClientsPage() {
             </button>
           </div>
         </form>
-      )}
+      </Modal>
 
       {/* Client list */}
       {clients.length === 0 ? (
@@ -296,6 +322,22 @@ export default function ClientsPage() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-3">
                       <span className="font-semibold text-lg">{client.name}</span>
+                      {client.social_media_id && (
+                        <a
+                          href={
+                            client.social_media_type === "ig"
+                              ? `https://www.instagram.com/${client.social_media_id.replace(/^@/, "")}/`
+                              : client.social_media_type === "fb"
+                                ? `https://www.facebook.com/${client.social_media_id.replace(/^@/, "")}`
+                                : `https://line.me/ti/p/~${client.social_media_id.replace(/^@/, "")}`
+                          }
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+                        >
+                          {SOCIAL_MEDIA_LABELS[client.social_media_type] ?? client.social_media_type}：@{client.social_media_id.replace(/^@/, "")}
+                        </a>
+                      )}
                       {client.phone && (
                         <span className="text-sm text-muted">{client.phone}</span>
                       )}

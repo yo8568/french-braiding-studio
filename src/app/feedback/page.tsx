@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
+import { usePageShow } from "@/lib/usePageShow";
 import { createClient } from "@/lib/supabase";
 import type { Feedback } from "@/lib/types";
 import {
@@ -17,7 +18,7 @@ export default function FeedbackPage() {
 
   const supabase = createClient();
 
-  useEffect(() => {
+  usePageShow(() => {
     supabase
       .from("feedback")
       .select("id,page,category,content,status,created_at,resolved_at")
@@ -27,7 +28,7 @@ export default function FeedbackPage() {
         setAllFeedback(data || []);
         setLoading(false);
       });
-  }, []);
+  });
 
   const feedbackList = useMemo(
     () =>

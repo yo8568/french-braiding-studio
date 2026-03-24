@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { usePageShow } from "@/lib/usePageShow";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase";
 import { uploadImages } from "@/lib/upload";
@@ -38,7 +39,7 @@ export default function NewWorkPage() {
   const [newThread, setNewThread] = useState(EMPTY_NEW_THREAD);
   const [showNewThread, setShowNewThread] = useState(false);
 
-  useEffect(() => {
+  usePageShow(() => {
     const supabase = createClient();
     async function load() {
       const [c, t, tech] = await Promise.all([
@@ -51,7 +52,7 @@ export default function NewWorkPage() {
       setTechniques(tech.data ?? []);
     }
     load();
-  }, []);
+  });
 
   async function handleAddClient() {
     if (!newClient.trim()) return;

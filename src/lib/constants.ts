@@ -57,5 +57,18 @@ export const FEEDBACK_STATUS_COLORS: Record<string, string> = {
   resolved: "bg-green-100 text-green-800",
 };
 
+// Social media labels
+export const SOCIAL_MEDIA_LABELS: Record<string, string> = {
+  ig: "Instagram",
+  line: "LINE",
+  fb: "Facebook",
+};
+
+// Thread thickness options (mm)
+export const THREAD_THICKNESS_OPTIONS = [3, 3.5, 4, 5, 6];
+
+// Thread source presets
+export const THREAD_SOURCE_PRESETS = ["純清製線", "娜泥手作"];
+
 // Convenience store options
 export const CONVENIENCE_STORES = ["7-ELEVEN", "全家", "萊爾富", "OK超商"];

@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { usePageShow } from "@/lib/usePageShow";
 import { createClient } from "@/lib/supabase";
 import {
   INPUT_CLASS,
@@ -12,6 +13,7 @@ import {
 } from "@/lib/constants";
 import { uploadImages } from "@/lib/upload";
 import type { Client, Order, OrderItem, Work, ClientNote } from "@/lib/types";
+import Modal from "@/app/components/Modal";
 
 export default function OrdersPage() {
   const supabase = createClient();
@@ -43,10 +45,9 @@ export default function OrdersPage() {
     { work_id: "", price: "", quantity: "1" },
   ]);
 
-  useEffect(() => {
+  usePageShow(() => {
     loadAll();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  });
 
   async function loadAll() {
     const [ordersRes, clientsRes, worksRes] = await Promise.all([
@@ -209,13 +210,8 @@ export default function OrdersPage() {
       </div>
 
       {/* New order form */}
-      {showForm && (
-        <form
-          onSubmit={handleSubmit}
-          className="bg-card border border-border rounded-xl p-6 mb-8 space-y-4"
-        >
-          <h2 className="text-xl font-semibold text-primary">新增訂單</h2>
-
+      <Modal open={showForm} onClose={() => setShowForm(false)} title="新增訂單">
+        <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="sm:col-span-2">
               <label className="block text-sm font-medium mb-1">客戶 *</label>
@@ -393,7 +389,7 @@ export default function OrdersPage() {
             </button>
           </div>
         </form>
-      )}
+      </Modal>
 
       {/* Order list */}
       {orders.length === 0 ? (

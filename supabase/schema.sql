@@ -7,6 +7,8 @@
 CREATE TABLE clients (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   name TEXT NOT NULL,
+  social_media_type TEXT NOT NULL DEFAULT 'ig' CHECK (social_media_type IN ('ig', 'line', 'fb')),
+  social_media_id TEXT,
   avatar_url TEXT,
   bio TEXT,
   created_at TIMESTAMPTZ DEFAULT now()
@@ -38,6 +40,8 @@ CREATE TABLE threads (
   material TEXT,
   thickness_mm DECIMAL(3, 1),
   source TEXT,
+  price DECIMAL(10, 2),
+  stock_length_cm DECIMAL(10, 2) DEFAULT 0,
   created_at TIMESTAMPTZ DEFAULT now()
 );
 

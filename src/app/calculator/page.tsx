@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { usePageShow } from "@/lib/usePageShow";
 import { createClient } from "@/lib/supabase";
 import { INPUT_CLASS } from "@/lib/constants";
 import type { Thread } from "@/lib/types";
@@ -68,10 +69,9 @@ export default function CalculatorPage() {
     cord3_multiplier: "",
   });
 
-  useEffect(() => {
+  usePageShow(() => {
     loadAll();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  });
 
   async function loadAll() {
     const [p, a, t] = await Promise.all([

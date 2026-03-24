@@ -1,6 +1,8 @@
 export interface Client {
   id: string;
   name: string;
+  social_media_type: "ig" | "line" | "fb";
+  social_media_id?: string;
   phone?: string;
   shipping_method?: "delivery" | "convenience_store";
   shipping_address?: string;
@@ -77,6 +79,8 @@ export interface Thread {
   material?: string;
   thickness_mm?: number;
   source?: string;
+  price?: number;
+  stock_length_cm?: number;
   created_at: string;
 }
 

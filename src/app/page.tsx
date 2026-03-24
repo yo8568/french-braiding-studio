@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { usePageShow } from "@/lib/usePageShow";
 import { createClient } from "@/lib/supabase";
 import type { Work } from "@/lib/types";
 
@@ -8,7 +9,7 @@ export default function Home() {
   const [recentWorks, setRecentWorks] = useState<Work[]>([]);
   const [stats, setStats] = useState({ works: 0, clients: 0, techniques: 0 });
 
-  useEffect(() => {
+  usePageShow(() => {
     const supabase = createClient();
 
     async function load() {
@@ -37,7 +38,7 @@ export default function Home() {
     }
 
     load();
-  }, []);
+  });
 
   return (
     <div className="space-y-10">

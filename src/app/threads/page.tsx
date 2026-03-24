@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { usePageShow } from "@/lib/usePageShow";
 import { createClient } from "@/lib/supabase";
-import { INPUT_CLASS } from "@/lib/constants";
+import { INPUT_CLASS, THREAD_SOURCE_PRESETS, THREAD_THICKNESS_OPTIONS } from "@/lib/constants";
 import type { Thread } from "@/lib/types";
+import Modal from "@/app/components/Modal";
 
 export default function ThreadsPage() {
   const supabase = createClient();
@@ -14,19 +16,22 @@ export default function ThreadsPage() {
   const [form, setForm] = useState({
     color_name: "",
     color_hex: "#000000",
-    material: "",
+    material: "包芯棉",
     thickness_mm: "",
     source: "",
+    price: "",
+    stock_length_cm: "",
   });
+  const [addStockId, setAddStockId] = useState<string | null>(null);
+  const [addStockLength, setAddStockLength] = useState("");
   const [showCsvUpload, setShowCsvUpload] = useState(false);
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [csvUploading, setCsvUploading] = useState(false);
   const [csvResult, setCsvResult] = useState<string | null>(null);
 
-  useEffect(() => {
+  usePageShow(() => {
     loadThreads();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  });
 
   async function loadThreads() {
     const { data } = await supabase
@@ -38,7 +43,7 @@ export default function ThreadsPage() {
   }
 
   function resetForm() {
-    setForm({ color_name: "", color_hex: "#000000", material: "", thickness_mm: "", source: "" });
+    setForm({ color_name: "", color_hex: "#000000", material: "包芯棉", thickness_mm: "", source: "", price: "", stock_length_cm: "" });
     setEditingId(null);
     setShowForm(false);
   }
@@ -50,6 +55,8 @@ export default function ThreadsPage() {
       material: thread.material ?? "",
       thickness_mm: thread.thickness_mm?.toString() ?? "",
       source: thread.source ?? "",
+      price: thread.price?.toString() ?? "",
+      stock_length_cm: thread.stock_length_cm?.toString() ?? "",
     });
     setEditingId(thread.id);
     setShowForm(true);
@@ -65,6 +72,8 @@ export default function ThreadsPage() {
       material: form.material || null,
       thickness_mm: form.thickness_mm ? parseFloat(form.thickness_mm) : null,
       source: form.source || null,
+      price: form.price ? parseFloat(form.price) : null,
+      stock_length_cm: form.stock_length_cm ? parseFloat(form.stock_length_cm) : 0,
     };
 
     if (editingId) {
@@ -77,6 +86,18 @@ export default function ThreadsPage() {
     loadThreads();
   }
 
+  async function handleAddStock(threadId: string) {
+    const length = parseFloat(addStockLength);
+    if (!length || length <= 0) return;
+    const thread = threads.find((t) => t.id === threadId);
+    if (!thread) return;
+    const newStock = (thread.stock_length_cm ?? 0) + length;
+    await supabase.from("threads").update({ stock_length_cm: newStock }).eq("id", threadId);
+    setAddStockId(null);
+    setAddStockLength("");
+    loadThreads();
+  }
+
   async function handleDelete(id: string) {
     if (!confirm("確定要刪除這個線材嗎？已關聯的作品會失去此線材資訊。")) return;
     await supabase.from("threads").delete().eq("id", id);
@@ -85,10 +106,10 @@ export default function ThreadsPage() {
 
   function downloadCsvTemplate() {
     const csv = [
-      "color_name,color_hex,material,thickness_mm,source",
-      "酒紅色,#8B0000,蠟線,0.8,蝦皮",
-      "天藍色,#87CEEB,棉線,1.0,手藝材料行",
-      "金色,#FFD700,尼龍,0.5,",
+      "color_name,color_hex,material,thickness_mm,source,price,stock_length_cm",
+      "酒紅色,#8B0000,蠟線,0.8,純清製線,120,500",
+      "天藍色,#87CEEB,棉線,1.0,娜泥手作,90,300",
+      "金色,#FFD700,尼龍,0.5,,60,",
     ].join("\n");
     const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
@@ -118,6 +139,8 @@ export default function ThreadsPage() {
       const materialIdx = headers.indexOf("material");
       const thicknessIdx = headers.indexOf("thickness_mm");
       const sourceIdx = headers.indexOf("source");
+      const priceIdx = headers.indexOf("price");
+      const stockIdx = headers.indexOf("stock_length_cm");
 
       if (nameIdx === -1) {
         setCsvResult("CSV 缺少 color_name 欄位");
@@ -136,6 +159,8 @@ export default function ThreadsPage() {
           material: materialIdx !== -1 && cols[materialIdx] ? cols[materialIdx] : null,
           thickness_mm: thicknessIdx !== -1 && cols[thicknessIdx] ? parseFloat(cols[thicknessIdx]) || null : null,
           source: sourceIdx !== -1 && cols[sourceIdx] ? cols[sourceIdx] : null,
+          price: priceIdx !== -1 && cols[priceIdx] ? parseFloat(cols[priceIdx]) || null : null,
+          stock_length_cm: stockIdx !== -1 && cols[stockIdx] ? parseFloat(cols[stockIdx]) || 0 : 0,
         });
       }
 
@@ -190,10 +215,9 @@ export default function ThreadsPage() {
         </div>
       </div>
 
-      {/* CSV Upload */}
-      {showCsvUpload && (
-        <div className="bg-card border border-border rounded-xl p-6 mb-8 space-y-4">
-          <h2 className="text-xl font-semibold text-primary">CSV 批次匯入</h2>
+      {/* CSV Upload Modal */}
+      <Modal open={showCsvUpload} onClose={() => { setShowCsvUpload(false); setCsvFile(null); setCsvResult(null); }} title="CSV 批次匯入">
+        <div className="space-y-4">
           <div className="text-sm text-muted space-y-1">
             <p>CSV 格式：每行一筆線材，第一行為標題列。</p>
             <p>必填欄位：<code className="bg-background px-1 rounded">color_name</code></p>
@@ -202,7 +226,9 @@ export default function ThreadsPage() {
               <code className="bg-background px-1 rounded">color_hex</code>、
               <code className="bg-background px-1 rounded">material</code>、
               <code className="bg-background px-1 rounded">thickness_mm</code>、
-              <code className="bg-background px-1 rounded">source</code>
+              <code className="bg-background px-1 rounded">source</code>、
+              <code className="bg-background px-1 rounded">price</code>、
+              <code className="bg-background px-1 rounded">stock_length_cm</code>
             </p>
           </div>
           <button
@@ -236,28 +262,18 @@ export default function ThreadsPage() {
             </button>
             <button
               type="button"
-              onClick={() => {
-                setShowCsvUpload(false);
-                setCsvFile(null);
-                setCsvResult(null);
-              }}
+              onClick={() => { setShowCsvUpload(false); setCsvFile(null); setCsvResult(null); }}
               className="border border-border px-6 py-2 rounded-lg hover:bg-card transition-colors"
             >
               取消
             </button>
           </div>
         </div>
-      )}
+      </Modal>
 
-      {/* Form */}
-      {showForm && (
-        <form
-          onSubmit={handleSubmit}
-          className="bg-card border border-border rounded-xl p-6 mb-8 space-y-4"
-        >
-          <h2 className="text-xl font-semibold text-primary">
-            {editingId ? "編輯線材" : "新增線材"}
-          </h2>
+      {/* Form Modal */}
+      <Modal open={showForm} onClose={resetForm} title={editingId ? "編輯線材" : "新增線材"}>
+        <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium mb-1">顏色名稱 *</label>
@@ -292,22 +308,52 @@ export default function ThreadsPage() {
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">粗細 (mm)</label>
+              <select
+                className={INPUT_CLASS}
+                value={form.thickness_mm}
+                onChange={(e) => setForm({ ...form, thickness_mm: e.target.value })}
+              >
+                <option value="">未選擇</option>
+                {THREAD_THICKNESS_OPTIONS.map((v) => (
+                  <option key={v} value={v.toString()}>{v} mm</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">來源</label>
+              <input
+                className={INPUT_CLASS}
+                list="source-presets"
+                value={form.source}
+                onChange={(e) => setForm({ ...form, source: e.target.value })}
+                placeholder="選擇或自行輸入"
+              />
+              <datalist id="source-presets">
+                {THREAD_SOURCE_PRESETS.map((s) => (
+                  <option key={s} value={s} />
+                ))}
+              </datalist>
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">購入價格 (NT$)</label>
+              <input
+                type="number"
+                step="1"
+                className={INPUT_CLASS}
+                value={form.price}
+                onChange={(e) => setForm({ ...form, price: e.target.value })}
+                placeholder="例：120"
+              />
+            </div>
+            <div className="sm:col-span-2">
+              <label className="block text-sm font-medium mb-1">庫存線長 (cm)</label>
               <input
                 type="number"
                 step="0.1"
                 className={INPUT_CLASS}
-                value={form.thickness_mm}
-                onChange={(e) => setForm({ ...form, thickness_mm: e.target.value })}
-                placeholder="例：0.8"
-              />
-            </div>
-            <div className="sm:col-span-2">
-              <label className="block text-sm font-medium mb-1">來源</label>
-              <input
-                className={INPUT_CLASS}
-                value={form.source}
-                onChange={(e) => setForm({ ...form, source: e.target.value })}
-                placeholder="例：蝦皮、手藝材料行、朋友送的"
+                value={form.stock_length_cm}
+                onChange={(e) => setForm({ ...form, stock_length_cm: e.target.value })}
+                placeholder="例：500"
               />
             </div>
           </div>
@@ -327,61 +373,98 @@ export default function ThreadsPage() {
             </button>
           </div>
         </form>
-      )}
+      </Modal>
 
       {/* Thread list */}
       {threads.length === 0 ? (
         <div className="text-center py-16 text-muted">尚無線材</div>
       ) : (
-        <div className="bg-card border border-border rounded-xl overflow-hidden">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-border bg-background">
-                <th className="text-left px-4 py-3 text-sm font-medium">顏色</th>
-                <th className="text-left px-4 py-3 text-sm font-medium">名稱</th>
-                <th className="text-left px-4 py-3 text-sm font-medium">材質</th>
-                <th className="text-left px-4 py-3 text-sm font-medium">粗細</th>
-                <th className="text-left px-4 py-3 text-sm font-medium">來源</th>
-                <th className="text-right px-4 py-3 text-sm font-medium">操作</th>
-              </tr>
-            </thead>
-            <tbody>
-              {threads.map((thread) => (
-                <tr
-                  key={thread.id}
-                  className="border-b border-border last:border-0 hover:bg-background/50"
-                >
-                  <td className="px-4 py-3">
-                    <div
-                      className="w-8 h-8 rounded-full border border-border"
-                      style={{ backgroundColor: thread.color_hex }}
-                      title={thread.color_hex}
+        <div className="space-y-3">
+          {threads.map((thread) => (
+            <div
+              key={thread.id}
+              className="bg-card border border-border rounded-xl p-4"
+            >
+              {/* Row 1: color + name + meta + actions */}
+              <div className="flex items-center gap-3">
+                <div
+                  className="w-10 h-10 rounded-full border border-border shrink-0"
+                  style={{ backgroundColor: thread.color_hex }}
+                  title={thread.color_hex}
+                />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-semibold">{thread.color_name}</span>
+                    {thread.material && (
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary">
+                        {thread.material}
+                      </span>
+                    )}
+                    {thread.thickness_mm && (
+                      <span className="text-xs text-muted">{thread.thickness_mm} mm</span>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1 text-sm text-muted">
+                    {thread.source && <span>來源：{thread.source}</span>}
+                    {thread.price && <span>價格：NT${thread.price}</span>}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    onClick={() => handleEdit(thread)}
+                    className="text-primary hover:text-accent text-sm"
+                  >
+                    編輯
+                  </button>
+                  <button
+                    onClick={() => handleDelete(thread.id)}
+                    className="text-red-400 hover:text-red-600 text-sm"
+                  >
+                    刪除
+                  </button>
+                </div>
+              </div>
+
+              {/* Row 2: stock */}
+              <div className="mt-3 pt-3 border-t border-border flex items-center justify-between">
+                <span className="text-sm">
+                  庫存：<span className="font-medium">{thread.stock_length_cm ? `${thread.stock_length_cm} cm` : "0 cm"}</span>
+                </span>
+                {addStockId === thread.id ? (
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      step="0.1"
+                      className="w-24 border border-border rounded-lg px-3 py-1.5 text-sm bg-card"
+                      value={addStockLength}
+                      onChange={(e) => setAddStockLength(e.target.value)}
+                      placeholder="新增 cm"
+                      autoFocus
                     />
-                  </td>
-                  <td className="px-4 py-3 font-medium">{thread.color_name}</td>
-                  <td className="px-4 py-3 text-muted">{thread.material ?? "—"}</td>
-                  <td className="px-4 py-3 text-muted">
-                    {thread.thickness_mm ? `${thread.thickness_mm} mm` : "—"}
-                  </td>
-                  <td className="px-4 py-3 text-muted">{thread.source ?? "—"}</td>
-                  <td className="px-4 py-3 text-right">
                     <button
-                      onClick={() => handleEdit(thread)}
-                      className="text-primary hover:text-accent text-sm mr-3"
+                      onClick={() => handleAddStock(thread.id)}
+                      className="text-sm text-white bg-green-600 px-3 py-1.5 rounded-lg hover:bg-green-700"
                     >
-                      編輯
+                      加入
                     </button>
                     <button
-                      onClick={() => handleDelete(thread.id)}
-                      className="text-red-400 hover:text-red-600 text-sm"
+                      onClick={() => { setAddStockId(null); setAddStockLength(""); }}
+                      className="text-sm text-muted hover:text-primary"
                     >
-                      刪除
+                      取消
                     </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setAddStockId(thread.id)}
+                    className="text-sm text-primary hover:text-accent"
+                  >
+                    + 補貨
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
         </div>
       )}
     </div>
