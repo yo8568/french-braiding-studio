@@ -8,7 +8,6 @@ import type { Thread } from "@/lib/types";
 interface CordPreset {
   id: string;
   knot_type: string;
-  multiplier: number;
   description: string;
   cord1_multiplier: number;
   cord2_multiplier: number;
@@ -54,7 +53,7 @@ export default function CalculatorPage() {
   const [showPresetForm, setShowPresetForm] = useState(false);
   const [editingPreset, setEditingPreset] = useState<CordPreset | null>(null);
   const [presetForm, setPresetForm] = useState({
-    knot_type: "", multiplier: "", description: "",
+    knot_type: "", description: "",
     cord1_multiplier: "", cord2_multiplier: "", cord3_multiplier: "",
   });
 
@@ -93,14 +92,14 @@ export default function CalculatorPage() {
 
   // --- Preset CRUD ---
   function resetPresetForm() {
-    setPresetForm({ knot_type: "", multiplier: "", description: "", cord1_multiplier: "", cord2_multiplier: "", cord3_multiplier: "" });
+    setPresetForm({ knot_type: "", description: "", cord1_multiplier: "", cord2_multiplier: "", cord3_multiplier: "" });
     setEditingPreset(null);
     setShowPresetForm(false);
   }
 
   function handleEditPreset(p: CordPreset) {
     setPresetForm({
-      knot_type: p.knot_type, multiplier: p.multiplier.toString(), description: p.description ?? "",
+      knot_type: p.knot_type, description: p.description ?? "",
       cord1_multiplier: p.cord1_multiplier?.toString() ?? "",
       cord2_multiplier: p.cord2_multiplier?.toString() ?? "",
       cord3_multiplier: p.cord3_multiplier?.toString() ?? "",
@@ -111,10 +110,9 @@ export default function CalculatorPage() {
 
   async function handleSubmitPreset(e: React.FormEvent) {
     e.preventDefault();
-    if (!presetForm.knot_type.trim() || !presetForm.multiplier) return;
+    if (!presetForm.knot_type.trim()) return;
     const payload = {
       knot_type: presetForm.knot_type.trim(),
-      multiplier: parseFloat(presetForm.multiplier) || 0,
       description: presetForm.description || null,
       cord1_multiplier: parseFloat(presetForm.cord1_multiplier) || 0,
       cord2_multiplier: parseFloat(presetForm.cord2_multiplier) || 0,
@@ -484,11 +482,6 @@ export default function CalculatorPage() {
                   <label className="block text-xs text-muted mb-1">結型名稱 *</label>
                   <input required className={INPUT_CLASS} value={presetForm.knot_type}
                     onChange={(e) => setPresetForm({ ...presetForm, knot_type: e.target.value })} placeholder="例：平結" />
-                </div>
-                <div>
-                  <label className="block text-xs text-muted mb-1">基本倍率</label>
-                  <input type="number" step="0.1" className={INPUT_CLASS} value={presetForm.multiplier}
-                    onChange={(e) => setPresetForm({ ...presetForm, multiplier: e.target.value })} placeholder="參考用" />
                 </div>
                 <div>
                   <label className="block text-xs text-muted mb-1">說明</label>
