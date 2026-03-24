@@ -44,6 +44,7 @@ export default function LoginPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="your@email.com"
+              autoComplete="email"
               autoFocus
             />
           </div>
@@ -55,6 +56,7 @@ export default function LoginPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="密碼"
+              autoComplete="current-password"
             />
           </div>
           {error && <p className="text-sm text-red-500">{error}</p>}
