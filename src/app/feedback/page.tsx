@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase";
 import type { Feedback } from "@/lib/types";
 import {
@@ -10,55 +10,57 @@ import {
 } from "@/lib/constants";
 
 export default function FeedbackPage() {
-  const [feedbackList, setFeedbackList] = useState<Feedback[]>([]);
+  const [allFeedback, setAllFeedback] = useState<Feedback[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState<"all" | "open" | "resolved">("all");
   const [filterCategory, setFilterCategory] = useState<string>("all");
 
   const supabase = createClient();
 
-  const fetchFeedback = async () => {
-    setLoading(true);
-    let query = supabase
-      .from("feedback")
-      .select("*")
-      .order("created_at", { ascending: false });
-
-    if (filterStatus !== "all") {
-      query = query.eq("status", filterStatus);
-    }
-    if (filterCategory !== "all") {
-      query = query.eq("category", filterCategory);
-    }
-
-    const { data } = await query;
-    setFeedbackList(data || []);
-    setLoading(false);
-  };
-
   useEffect(() => {
-    fetchFeedback();
-  }, [filterStatus, filterCategory]);
-
-  const toggleResolved = async (item: Feedback) => {
-    const newStatus = item.status === "open" ? "resolved" : "open";
-    await supabase
+    supabase
       .from("feedback")
-      .update({
-        status: newStatus,
-        resolved_at: newStatus === "resolved" ? new Date().toISOString() : null,
-      })
-      .eq("id", item.id);
-    fetchFeedback();
+      .select("id,page,category,content,status,created_at,resolved_at")
+      .order("created_at", { ascending: false })
+      .limit(200)
+      .then(({ data }) => {
+        setAllFeedback(data || []);
+        setLoading(false);
+      });
+  }, []);
+
+  const feedbackList = useMemo(
+    () =>
+      allFeedback.filter(
+        (f) =>
+          (filterStatus === "all" || f.status === filterStatus) &&
+          (filterCategory === "all" || f.category === filterCategory)
+      ),
+    [allFeedback, filterStatus, filterCategory]
+  );
+
+  const toggleResolved = (item: Feedback) => {
+    const newStatus = item.status === "open" ? "resolved" : "open";
+    const resolvedAt = newStatus === "resolved" ? new Date().toISOString() : undefined;
+    setAllFeedback((prev) =>
+      prev.map((f) =>
+        f.id === item.id ? { ...f, status: newStatus, resolved_at: resolvedAt } : f
+      )
+    );
+    supabase
+      .from("feedback")
+      .update({ status: newStatus, resolved_at: resolvedAt ?? null })
+      .eq("id", item.id)
+      .then();
   };
 
-  const deleteFeedback = async (id: string) => {
+  const deleteFeedback = (id: string) => {
     if (!confirm("確定要刪除這筆回饋？")) return;
-    await supabase.from("feedback").delete().eq("id", id);
-    fetchFeedback();
+    setAllFeedback((prev) => prev.filter((f) => f.id !== id));
+    supabase.from("feedback").delete().eq("id", id).then();
   };
 
-  const openCount = feedbackList.filter((f) => f.status === "open").length;
+  const openCount = allFeedback.filter((f) => f.status === "open").length;
 
   return (
     <div>
@@ -97,7 +99,19 @@ export default function FeedbackPage() {
 
       {/* List */}
       {loading ? (
-        <p className="text-muted text-center py-12">載入中...</p>
+        <div className="space-y-3">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="border border-border rounded-xl p-4 bg-card animate-pulse">
+              <div className="flex gap-2 mb-2">
+                <div className="h-5 w-14 bg-gray-200 rounded-full" />
+                <div className="h-5 w-10 bg-gray-200 rounded-full" />
+                <div className="h-5 w-20 bg-gray-200 rounded-full" />
+              </div>
+              <div className="h-4 w-3/4 bg-gray-200 rounded mt-2" />
+              <div className="h-3 w-1/3 bg-gray-200 rounded mt-3" />
+            </div>
+          ))}
+        </div>
       ) : feedbackList.length === 0 ? (
         <p className="text-muted text-center py-12">目前沒有回饋資料</p>
       ) : (
