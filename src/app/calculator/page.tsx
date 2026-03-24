@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase";
 import { INPUT_CLASS } from "@/lib/constants";
+import type { Thread } from "@/lib/types";
 
 interface CordPreset {
   id: string;
@@ -42,8 +43,9 @@ export default function CalculatorPage() {
   const supabase = createClient();
   const [presets, setPresets] = useState<CordPreset[]>([]);
   const [arrangements, setArrangements] = useState<Arrangement[]>([]);
+  const [threads, setThreads] = useState<Thread[]>([]);
   const [sections, setSections] = useState<Section[]>([{ ...EMPTY_SECTION }]);
-  const [cordNames, setCordNames] = useState(["線1", "線2", "線3"]);
+  const [selectedThreadIds, setSelectedThreadIds] = useState(["", "", ""]);
 
   // Preset management
   const [showPresetForm, setShowPresetForm] = useState(false);
@@ -67,12 +69,20 @@ export default function CalculatorPage() {
   }, []);
 
   async function loadAll() {
-    const [p, a] = await Promise.all([
+    const [p, a, t] = await Promise.all([
       supabase.from("cord_presets").select("*").order("knot_type"),
       supabase.from("knot_arrangements").select("*").order("name"),
+      supabase.from("threads").select("*").order("color_name"),
     ]);
     if (p.data) setPresets(p.data);
     if (a.data) setArrangements(a.data);
+    if (t.data) setThreads(t.data);
+  }
+
+  function getCordName(index: number): string {
+    const threadId = selectedThreadIds[index];
+    const thread = threads.find((t) => t.id === threadId);
+    return thread ? `${thread.color_name}${thread.material ? ` (${thread.material})` : ""}` : `線${index + 1}`;
   }
 
   // --- Preset CRUD ---
@@ -216,23 +226,42 @@ export default function CalculatorPage() {
         </p>
       </div>
 
-      {/* Cord names */}
+      {/* Cord selection */}
       <div className="bg-card border border-border rounded-xl p-4">
-        <p className="text-sm font-medium mb-2">線材命名</p>
+        <p className="text-sm font-medium mb-2">選擇三條線材</p>
         <div className="grid grid-cols-3 gap-3">
-          {cordNames.map((name, i) => (
-            <input
-              key={i}
-              className={INPUT_CLASS}
-              value={name}
-              onChange={(e) => {
-                const updated = [...cordNames];
-                updated[i] = e.target.value;
-                setCordNames(updated);
-              }}
-              placeholder={`線${i + 1}`}
-            />
-          ))}
+          {selectedThreadIds.map((threadId, i) => {
+            const selected = threads.find((t) => t.id === threadId);
+            return (
+              <div key={i}>
+                <label className="block text-xs text-muted mb-1">線 {i + 1}</label>
+                <div className="flex items-center gap-2">
+                  {selected && (
+                    <div
+                      className="w-6 h-6 rounded-full border border-border shrink-0"
+                      style={{ backgroundColor: selected.color_hex }}
+                    />
+                  )}
+                  <select
+                    className={INPUT_CLASS}
+                    value={threadId}
+                    onChange={(e) => {
+                      const updated = [...selectedThreadIds];
+                      updated[i] = e.target.value;
+                      setSelectedThreadIds(updated);
+                    }}
+                  >
+                    <option value="">選擇線材</option>
+                    {threads.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.color_name} {t.material ? `(${t.material})` : ""} {t.thickness_mm ? `${t.thickness_mm}mm` : ""}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
 
@@ -329,7 +358,7 @@ export default function CalculatorPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs text-muted mb-1">{cordNames[0]} 倍率</label>
+                  <label className="block text-xs text-muted mb-1">{getCordName(0)} 倍率</label>
                   <input
                     type="number"
                     step="0.1"
@@ -340,7 +369,7 @@ export default function CalculatorPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs text-muted mb-1">{cordNames[1]} 倍率</label>
+                  <label className="block text-xs text-muted mb-1">{getCordName(1)} 倍率</label>
                   <input
                     type="number"
                     step="0.1"
@@ -351,7 +380,7 @@ export default function CalculatorPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs text-muted mb-1">{cordNames[2]} 倍率</label>
+                  <label className="block text-xs text-muted mb-1">{getCordName(2)} 倍率</label>
                   <input
                     type="number"
                     step="0.1"
@@ -368,7 +397,7 @@ export default function CalculatorPage() {
                 <div className="flex flex-wrap gap-3 text-xs pt-1">
                   {cordLengths.map((len, ci) => (
                     <span key={ci}>
-                      {cordNames[ci]}: <strong className="text-primary">{len.toFixed(1)} cm</strong>
+                      {getCordName(ci)}: <strong className="text-primary">{len.toFixed(1)} cm</strong>
                     </span>
                   ))}
                 </div>
@@ -385,7 +414,7 @@ export default function CalculatorPage() {
           <div className="grid grid-cols-3 gap-4 text-center">
             {cordTotals.map((total, i) => (
               <div key={i}>
-                <p className="text-sm text-muted">{cordNames[i]}</p>
+                <p className="text-sm text-muted">{getCordName(i)}</p>
                 <p className="text-2xl font-bold text-primary">
                   {total.toFixed(1)} <span className="text-sm">cm</span>
                 </p>
@@ -474,7 +503,7 @@ export default function CalculatorPage() {
                           <span>
                             <strong>{a.name}</strong>
                             <span className="text-muted ml-2">
-                              {cordNames[0]}:x{a.cord1_multiplier} / {cordNames[1]}:x{a.cord2_multiplier} / {cordNames[2]}:x{a.cord3_multiplier}
+                              {getCordName(0)}:x{a.cord1_multiplier} / {getCordName(1)}:x{a.cord2_multiplier} / {getCordName(2)}:x{a.cord3_multiplier}
                             </span>
                           </span>
                           <div className="flex gap-2">
@@ -523,17 +552,17 @@ export default function CalculatorPage() {
               </div>
               <div className="grid grid-cols-3 gap-3">
                 <div>
-                  <label className="block text-xs text-muted mb-1">{cordNames[0]} 倍率 *</label>
+                  <label className="block text-xs text-muted mb-1">{getCordName(0)} 倍率 *</label>
                   <input required type="number" step="0.1" className={INPUT_CLASS} value={arrForm.cord1_multiplier}
                     onChange={(e) => setArrForm({ ...arrForm, cord1_multiplier: e.target.value })} placeholder="例：1" />
                 </div>
                 <div>
-                  <label className="block text-xs text-muted mb-1">{cordNames[1]} 倍率 *</label>
+                  <label className="block text-xs text-muted mb-1">{getCordName(1)} 倍率 *</label>
                   <input required type="number" step="0.1" className={INPUT_CLASS} value={arrForm.cord2_multiplier}
                     onChange={(e) => setArrForm({ ...arrForm, cord2_multiplier: e.target.value })} placeholder="例：4" />
                 </div>
                 <div>
-                  <label className="block text-xs text-muted mb-1">{cordNames[2]} 倍率 *</label>
+                  <label className="block text-xs text-muted mb-1">{getCordName(2)} 倍率 *</label>
                   <input required type="number" step="0.1" className={INPUT_CLASS} value={arrForm.cord3_multiplier}
                     onChange={(e) => setArrForm({ ...arrForm, cord3_multiplier: e.target.value })} placeholder="例：4" />
                 </div>
