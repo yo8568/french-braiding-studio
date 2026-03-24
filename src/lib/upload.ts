@@ -1,9 +1,20 @@
 import { createClient } from "@/lib/supabase";
+import heic2any from "heic2any";
+
+const HEIC_TYPES = ["image/heic", "image/heif"];
+
+/**
+ * Convert HEIC/HEIF file to a standard Blob that browsers can handle.
+ */
+async function convertHeic(file: File): Promise<Blob> {
+  const blob = await heic2any({ blob: file, toType: "image/jpeg", quality: 0.85 });
+  return Array.isArray(blob) ? blob[0] : blob;
+}
 
 /**
  * Convert a File (image) to a JPEG Blob using canvas.
  */
-function fileToJpeg(file: File, quality = 0.85): Promise<Blob> {
+function fileToJpeg(blob: Blob, quality = 0.85): Promise<Blob> {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.onload = () => {
@@ -14,22 +25,24 @@ function fileToJpeg(file: File, quality = 0.85): Promise<Blob> {
       if (!ctx) return reject(new Error("Canvas context failed"));
       ctx.drawImage(img, 0, 0);
       canvas.toBlob(
-        (blob) => {
-          if (blob) resolve(blob);
+        (result) => {
+          if (result) resolve(result);
           else reject(new Error("toBlob failed"));
         },
         "image/jpeg",
         quality
       );
+      URL.revokeObjectURL(img.src);
     };
     img.onerror = () => reject(new Error("Image load failed"));
-    img.src = URL.createObjectURL(file);
+    img.src = URL.createObjectURL(blob);
   });
 }
 
 /**
  * Upload files to Supabase storage and return their public URLs.
- * Images are converted to JPEG via canvas before uploading.
+ * HEIC/HEIF files are first converted via heic2any, then all images
+ * are converted to JPEG via canvas before uploading.
  */
 export async function uploadImages(
   files: File[],
@@ -39,7 +52,11 @@ export async function uploadImages(
   const urls: string[] = [];
 
   for (const file of files) {
-    const jpegBlob = await fileToJpeg(file);
+    const isHeic =
+      HEIC_TYPES.includes(file.type) ||
+      /\.(heic|heif)$/i.test(file.name);
+    const source = isHeic ? await convertHeic(file) : file;
+    const jpegBlob = await fileToJpeg(source);
     const path = `${prefix}${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`;
     const { error } = await supabase.storage
       .from("work-images")
