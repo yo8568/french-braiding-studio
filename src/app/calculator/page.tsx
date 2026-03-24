@@ -11,36 +11,71 @@ interface CordPreset {
   description: string;
 }
 
-interface Section {
-  knot_type: string;
-  length_cm: string;
-  cord_count: string;
-  custom_multiplier: string;
+interface Arrangement {
+  id: string;
+  cord_preset_id: string;
+  name: string;
+  cord1_multiplier: number;
+  cord2_multiplier: number;
+  cord3_multiplier: number;
 }
 
-const EMPTY_SECTION: Section = { knot_type: "", length_cm: "", cord_count: "1", custom_multiplier: "" };
+interface Section {
+  knot_type: string;
+  arrangement_id: string;
+  length_cm: string;
+  cord1_mult: string;
+  cord2_mult: string;
+  cord3_mult: string;
+}
+
+const EMPTY_SECTION: Section = {
+  knot_type: "",
+  arrangement_id: "",
+  length_cm: "",
+  cord1_mult: "",
+  cord2_mult: "",
+  cord3_mult: "",
+};
 
 export default function CalculatorPage() {
   const supabase = createClient();
   const [presets, setPresets] = useState<CordPreset[]>([]);
+  const [arrangements, setArrangements] = useState<Arrangement[]>([]);
   const [sections, setSections] = useState<Section[]>([{ ...EMPTY_SECTION }]);
+  const [cordNames, setCordNames] = useState(["線1", "線2", "線3"]);
+
+  // Preset management
   const [showPresetForm, setShowPresetForm] = useState(false);
   const [editingPreset, setEditingPreset] = useState<CordPreset | null>(null);
   const [presetForm, setPresetForm] = useState({ knot_type: "", multiplier: "", description: "" });
 
+  // Arrangement management
+  const [showArrForm, setShowArrForm] = useState(false);
+  const [editingArr, setEditingArr] = useState<Arrangement | null>(null);
+  const [arrForm, setArrForm] = useState({
+    cord_preset_id: "",
+    name: "",
+    cord1_multiplier: "",
+    cord2_multiplier: "",
+    cord3_multiplier: "",
+  });
+
   useEffect(() => {
-    loadPresets();
+    loadAll();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function loadPresets() {
-    const { data } = await supabase
-      .from("cord_presets")
-      .select("*")
-      .order("knot_type");
-    if (data) setPresets(data);
+  async function loadAll() {
+    const [p, a] = await Promise.all([
+      supabase.from("cord_presets").select("*").order("knot_type"),
+      supabase.from("knot_arrangements").select("*").order("name"),
+    ]);
+    if (p.data) setPresets(p.data);
+    if (a.data) setArrangements(a.data);
   }
 
+  // --- Preset CRUD ---
   function resetPresetForm() {
     setPresetForm({ knot_type: "", multiplier: "", description: "" });
     setEditingPreset(null);
@@ -48,11 +83,7 @@ export default function CalculatorPage() {
   }
 
   function handleEditPreset(p: CordPreset) {
-    setPresetForm({
-      knot_type: p.knot_type,
-      multiplier: p.multiplier.toString(),
-      description: p.description ?? "",
-    });
+    setPresetForm({ knot_type: p.knot_type, multiplier: p.multiplier.toString(), description: p.description ?? "" });
     setEditingPreset(p);
     setShowPresetForm(true);
   }
@@ -60,57 +91,118 @@ export default function CalculatorPage() {
   async function handleSubmitPreset(e: React.FormEvent) {
     e.preventDefault();
     if (!presetForm.knot_type.trim() || !presetForm.multiplier) return;
-
     const payload = {
       knot_type: presetForm.knot_type.trim(),
       multiplier: parseFloat(presetForm.multiplier),
       description: presetForm.description || null,
     };
-
     if (editingPreset) {
       await supabase.from("cord_presets").update(payload).eq("id", editingPreset.id);
     } else {
       await supabase.from("cord_presets").insert(payload);
     }
-
     resetPresetForm();
-    loadPresets();
+    loadAll();
   }
 
   async function handleDeletePreset(id: string) {
-    if (!confirm("確定要刪除這個結型嗎？")) return;
+    if (!confirm("確定要刪除？相關搭配方式也會被刪除。")) return;
+    await supabase.from("knot_arrangements").delete().eq("cord_preset_id", id);
     await supabase.from("cord_presets").delete().eq("id", id);
-    loadPresets();
+    loadAll();
   }
 
-  function updateSection(index: number, field: keyof Section, value: string) {
+  // --- Arrangement CRUD ---
+  function resetArrForm() {
+    setArrForm({ cord_preset_id: "", name: "", cord1_multiplier: "", cord2_multiplier: "", cord3_multiplier: "" });
+    setEditingArr(null);
+    setShowArrForm(false);
+  }
+
+  function handleEditArr(a: Arrangement) {
+    setArrForm({
+      cord_preset_id: a.cord_preset_id,
+      name: a.name,
+      cord1_multiplier: a.cord1_multiplier.toString(),
+      cord2_multiplier: a.cord2_multiplier.toString(),
+      cord3_multiplier: a.cord3_multiplier.toString(),
+    });
+    setEditingArr(a);
+    setShowArrForm(true);
+  }
+
+  async function handleSubmitArr(e: React.FormEvent) {
+    e.preventDefault();
+    if (!arrForm.cord_preset_id || !arrForm.name.trim()) return;
+    const payload = {
+      cord_preset_id: arrForm.cord_preset_id,
+      name: arrForm.name.trim(),
+      cord1_multiplier: parseFloat(arrForm.cord1_multiplier) || 1,
+      cord2_multiplier: parseFloat(arrForm.cord2_multiplier) || 1,
+      cord3_multiplier: parseFloat(arrForm.cord3_multiplier) || 1,
+    };
+    if (editingArr) {
+      await supabase.from("knot_arrangements").update(payload).eq("id", editingArr.id);
+    } else {
+      await supabase.from("knot_arrangements").insert(payload);
+    }
+    resetArrForm();
+    loadAll();
+  }
+
+  async function handleDeleteArr(id: string) {
+    await supabase.from("knot_arrangements").delete().eq("id", id);
+    loadAll();
+  }
+
+  // --- Section logic ---
+  function updateSection(i: number, field: keyof Section, value: string) {
     const updated = [...sections];
-    updated[index] = { ...updated[index], [field]: value };
+    updated[i] = { ...updated[i], [field]: value };
     setSections(updated);
   }
 
-  function getMultiplier(section: Section): number {
-    if (section.custom_multiplier) return parseFloat(section.custom_multiplier) || 0;
-    const preset = presets.find((p) => p.knot_type === section.knot_type);
-    return preset?.multiplier ?? 0;
+  function handleSelectKnot(i: number, knotType: string) {
+    const updated = [...sections];
+    updated[i] = { ...updated[i], knot_type: knotType, arrangement_id: "", cord1_mult: "", cord2_mult: "", cord3_mult: "" };
+    setSections(updated);
   }
 
-  function getSectionResult(section: Section) {
-    const multiplier = getMultiplier(section);
-    const length = parseFloat(section.length_cm) || 0;
-    const cordCount = parseInt(section.cord_count) || 1;
-    const perCord = length * multiplier;
-    const total = perCord * cordCount;
-    return { multiplier, perCord, total, cordCount };
+  function handleSelectArrangement(i: number, arrId: string) {
+    const arr = arrangements.find((a) => a.id === arrId);
+    const updated = [...sections];
+    updated[i] = {
+      ...updated[i],
+      arrangement_id: arrId,
+      cord1_mult: arr ? arr.cord1_multiplier.toString() : "",
+      cord2_mult: arr ? arr.cord2_multiplier.toString() : "",
+      cord3_mult: arr ? arr.cord3_multiplier.toString() : "",
+    };
+    setSections(updated);
   }
 
-  // Grand totals
-  const sectionResults = sections.map(getSectionResult);
-  const grandTotalPerCord = sectionResults.reduce((sum, r) => sum + r.perCord, 0);
-  const grandTotal = sectionResults.reduce((sum, r) => sum + r.total, 0);
-  const totalFinishedLength = sections.reduce((sum, s) => sum + (parseFloat(s.length_cm) || 0), 0);
+  function getCordLengths(s: Section) {
+    const len = parseFloat(s.length_cm) || 0;
+    return [
+      len * (parseFloat(s.cord1_mult) || 0),
+      len * (parseFloat(s.cord2_mult) || 0),
+      len * (parseFloat(s.cord3_mult) || 0),
+    ];
+  }
 
-  function formatLength(cm: number) {
+  // Totals per cord
+  const cordTotals = [0, 0, 0];
+  let totalFinished = 0;
+  for (const s of sections) {
+    const lengths = getCordLengths(s);
+    cordTotals[0] += lengths[0];
+    cordTotals[1] += lengths[1];
+    cordTotals[2] += lengths[2];
+    totalFinished += parseFloat(s.length_cm) || 0;
+  }
+  const grandTotal = cordTotals[0] + cordTotals[1] + cordTotals[2];
+
+  function fmt(cm: number) {
     if (cm >= 100) return `${cm.toFixed(1)} cm (${(cm / 100).toFixed(2)} m)`;
     return `${cm.toFixed(1)} cm`;
   }
@@ -120,8 +212,28 @@ export default function CalculatorPage() {
       <div>
         <h1 className="text-3xl font-bold">繩長計算機</h1>
         <p className="text-muted mt-2">
-          一條作品可由多種繩結組成，分段計算後加總所需繩長
+          一條作品由 3 條線、多種繩結段落組成，每段可選不同搭配方式
         </p>
+      </div>
+
+      {/* Cord names */}
+      <div className="bg-card border border-border rounded-xl p-4">
+        <p className="text-sm font-medium mb-2">線材命名</p>
+        <div className="grid grid-cols-3 gap-3">
+          {cordNames.map((name, i) => (
+            <input
+              key={i}
+              className={INPUT_CLASS}
+              value={name}
+              onChange={(e) => {
+                const updated = [...cordNames];
+                updated[i] = e.target.value;
+                setCordNames(updated);
+              }}
+              placeholder={`線${i + 1}`}
+            />
+          ))}
+        </div>
       </div>
 
       {/* Sections */}
@@ -137,8 +249,11 @@ export default function CalculatorPage() {
         </div>
 
         {sections.map((section, i) => {
-          const result = sectionResults[i];
           const preset = presets.find((p) => p.knot_type === section.knot_type);
+          const knotArrangements = preset
+            ? arrangements.filter((a) => a.cord_preset_id === preset.id)
+            : [];
+          const cordLengths = getCordLengths(section);
 
           return (
             <div key={i} className="border border-border rounded-lg p-4 space-y-3 bg-background">
@@ -154,7 +269,7 @@ export default function CalculatorPage() {
                 )}
               </div>
 
-              {/* Knot type selection */}
+              {/* Knot type */}
               <div>
                 <label className="block text-xs text-muted mb-1">結型</label>
                 <div className="flex flex-wrap gap-1.5">
@@ -162,233 +277,274 @@ export default function CalculatorPage() {
                     <button
                       key={p.id}
                       type="button"
-                      onClick={() => updateSection(i, "knot_type", p.knot_type)}
+                      onClick={() => handleSelectKnot(i, p.knot_type)}
                       className={`px-2.5 py-1 rounded text-xs transition-colors ${
                         section.knot_type === p.knot_type
                           ? "bg-primary text-white"
                           : "bg-card border border-border hover:bg-border"
                       }`}
                     >
-                      {p.knot_type} (x{p.multiplier})
+                      {p.knot_type}
                     </button>
                   ))}
                 </div>
-                {preset?.description && (
-                  <p className="text-xs text-muted mt-1">{preset.description}</p>
-                )}
               </div>
 
-              {/* Inputs */}
-              <div className="grid grid-cols-3 gap-3">
+              {/* Arrangement */}
+              {section.knot_type && knotArrangements.length > 0 && (
                 <div>
-                  <label className="block text-xs text-muted mb-1">成品長度 (cm)</label>
+                  <label className="block text-xs text-muted mb-1">搭配方式</label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {knotArrangements.map((a) => (
+                      <button
+                        key={a.id}
+                        type="button"
+                        onClick={() => handleSelectArrangement(i, a.id)}
+                        className={`px-2.5 py-1 rounded text-xs transition-colors ${
+                          section.arrangement_id === a.id
+                            ? "bg-accent text-white"
+                            : "bg-card border border-border hover:bg-border"
+                        }`}
+                      >
+                        {a.name}
+                        <span className="opacity-70 ml-1">
+                          ({a.cord1_multiplier}/{a.cord2_multiplier}/{a.cord3_multiplier})
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Length + per-cord multipliers */}
+              <div className="grid grid-cols-4 gap-2">
+                <div>
+                  <label className="block text-xs text-muted mb-1">長度 (cm)</label>
                   <input
                     type="number"
                     className={INPUT_CLASS}
                     value={section.length_cm}
                     onChange={(e) => updateSection(i, "length_cm", e.target.value)}
-                    placeholder="例: 10"
+                    placeholder="10"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs text-muted mb-1">繩數</label>
-                  <input
-                    type="number"
-                    className={INPUT_CLASS}
-                    value={section.cord_count}
-                    onChange={(e) => updateSection(i, "cord_count", e.target.value)}
-                    placeholder="1"
-                    min="1"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs text-muted mb-1">自訂倍率</label>
+                  <label className="block text-xs text-muted mb-1">{cordNames[0]} 倍率</label>
                   <input
                     type="number"
                     step="0.1"
                     className={INPUT_CLASS}
-                    value={section.custom_multiplier}
-                    onChange={(e) => updateSection(i, "custom_multiplier", e.target.value)}
-                    placeholder={`預設 ${preset?.multiplier ?? "—"}`}
+                    value={section.cord1_mult}
+                    onChange={(e) => updateSection(i, "cord1_mult", e.target.value)}
+                    placeholder="0"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-muted mb-1">{cordNames[1]} 倍率</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    className={INPUT_CLASS}
+                    value={section.cord2_mult}
+                    onChange={(e) => updateSection(i, "cord2_mult", e.target.value)}
+                    placeholder="0"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-muted mb-1">{cordNames[2]} 倍率</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    className={INPUT_CLASS}
+                    value={section.cord3_mult}
+                    onChange={(e) => updateSection(i, "cord3_mult", e.target.value)}
+                    placeholder="0"
                   />
                 </div>
               </div>
 
               {/* Section result */}
-              {result.perCord > 0 && (
-                <div className="flex gap-4 text-sm pt-1">
-                  <span className="text-muted">倍率 x{result.multiplier}</span>
-                  <span>每條 <strong className="text-primary">{result.perCord.toFixed(1)} cm</strong></span>
-                  <span>小計 <strong className="text-accent">{result.total.toFixed(1)} cm</strong></span>
+              {(cordLengths[0] > 0 || cordLengths[1] > 0 || cordLengths[2] > 0) && (
+                <div className="flex flex-wrap gap-3 text-xs pt-1">
+                  {cordLengths.map((len, ci) => (
+                    <span key={ci}>
+                      {cordNames[ci]}: <strong className="text-primary">{len.toFixed(1)} cm</strong>
+                    </span>
+                  ))}
                 </div>
               )}
             </div>
           );
         })}
 
-        {/* Grand total */}
+        {/* Grand totals */}
         <div className="bg-background rounded-xl p-6 space-y-4">
-          <div className="text-center">
-            <p className="text-sm text-muted mb-1">作品總成品長度</p>
-            <p className="text-lg font-semibold">{formatLength(totalFinishedLength)}</p>
+          <p className="text-sm text-muted text-center mb-1">
+            成品總長: {fmt(totalFinished)}
+          </p>
+          <div className="grid grid-cols-3 gap-4 text-center">
+            {cordTotals.map((total, i) => (
+              <div key={i}>
+                <p className="text-sm text-muted">{cordNames[i]}</p>
+                <p className="text-2xl font-bold text-primary">
+                  {total.toFixed(1)} <span className="text-sm">cm</span>
+                </p>
+                {total >= 100 && (
+                  <p className="text-xs text-muted">= {(total / 100).toFixed(2)} m</p>
+                )}
+              </div>
+            ))}
           </div>
-          <div className="grid grid-cols-2 gap-4 text-center">
-            <div>
-              <p className="text-sm text-muted">每條繩所需總長</p>
-              <p className="text-3xl font-bold text-primary">
-                {grandTotalPerCord.toFixed(1)} <span className="text-base">cm</span>
-              </p>
-              {grandTotalPerCord >= 100 && (
-                <p className="text-sm text-muted">= {(grandTotalPerCord / 100).toFixed(2)} m</p>
-              )}
-            </div>
-            <div>
-              <p className="text-sm text-muted">所有繩子總長</p>
-              <p className="text-3xl font-bold text-accent">
-                {grandTotal.toFixed(1)} <span className="text-base">cm</span>
-              </p>
-              {grandTotal >= 100 && (
-                <p className="text-sm text-muted">= {(grandTotal / 100).toFixed(2)} m</p>
-              )}
-            </div>
+          <div className="text-center pt-2 border-t border-border">
+            <p className="text-sm text-muted">三條線總計</p>
+            <p className="text-3xl font-bold text-accent">
+              {grandTotal.toFixed(1)} <span className="text-base">cm</span>
+            </p>
+            {grandTotal >= 100 && (
+              <p className="text-sm text-muted">= {(grandTotal / 100).toFixed(2)} m</p>
+            )}
           </div>
         </div>
 
-        {/* Section breakdown table */}
-        {sections.filter((s) => s.knot_type && s.length_cm).length > 1 && (
-          <div>
-            <p className="text-sm font-medium mb-2">段落明細</p>
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border text-muted">
-                  <th className="text-left py-1.5">段落</th>
-                  <th className="text-left py-1.5">結型</th>
-                  <th className="text-right py-1.5">長度</th>
-                  <th className="text-right py-1.5">倍率</th>
-                  <th className="text-right py-1.5">繩數</th>
-                  <th className="text-right py-1.5">小計</th>
-                </tr>
-              </thead>
-              <tbody>
-                {sections.map((s, i) => {
-                  const r = sectionResults[i];
-                  if (!s.knot_type || !s.length_cm) return null;
-                  return (
-                    <tr key={i} className="border-b border-border last:border-0">
-                      <td className="py-1.5">{i + 1}</td>
-                      <td className="py-1.5">{s.knot_type}</td>
-                      <td className="text-right py-1.5">{s.length_cm} cm</td>
-                      <td className="text-right py-1.5">x{r.multiplier}</td>
-                      <td className="text-right py-1.5">{r.cordCount}</td>
-                      <td className="text-right py-1.5 font-medium">{r.total.toFixed(1)} cm</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-
         <p className="text-xs text-muted text-center">
-          提示：實際用量可能因個人手勁、結的鬆緊、線材粗細而有差異，建議多預留 10-15%
+          提示：實際用量可能因個人手勁、結的鬆緊而有差異，建議多預留 10-15%
         </p>
       </div>
 
-      {/* Reference Table */}
-      <div className="bg-card border border-border rounded-xl p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-semibold text-primary">繩長倍率參考表</h2>
-          <button
-            onClick={() => {
-              resetPresetForm();
-              setShowPresetForm(true);
-            }}
-            className="bg-primary text-white px-4 py-1.5 rounded-lg text-sm hover:bg-accent transition-colors"
-          >
-            + 新增結型
-          </button>
+      {/* Knot types & arrangements management */}
+      <div className="bg-card border border-border rounded-xl p-6 space-y-6">
+        {/* Knot types */}
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold text-primary">結型管理</h2>
+            <button
+              onClick={() => { resetPresetForm(); setShowPresetForm(true); }}
+              className="bg-primary text-white px-4 py-1.5 rounded-lg text-sm hover:bg-accent transition-colors"
+            >
+              + 新增結型
+            </button>
+          </div>
+
+          {showPresetForm && (
+            <form onSubmit={handleSubmitPreset} className="border border-border rounded-lg p-4 mb-4 space-y-3 bg-background">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-xs text-muted mb-1">結型名稱 *</label>
+                  <input required className={INPUT_CLASS} value={presetForm.knot_type}
+                    onChange={(e) => setPresetForm({ ...presetForm, knot_type: e.target.value })} placeholder="例：平結" />
+                </div>
+                <div>
+                  <label className="block text-xs text-muted mb-1">基本倍率</label>
+                  <input type="number" step="0.1" className={INPUT_CLASS} value={presetForm.multiplier}
+                    onChange={(e) => setPresetForm({ ...presetForm, multiplier: e.target.value })} placeholder="參考用" />
+                </div>
+                <div>
+                  <label className="block text-xs text-muted mb-1">說明</label>
+                  <input className={INPUT_CLASS} value={presetForm.description}
+                    onChange={(e) => setPresetForm({ ...presetForm, description: e.target.value })} />
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <button type="submit" className="bg-primary text-white px-4 py-1 rounded-lg text-sm">{editingPreset ? "更新" : "新增"}</button>
+                <button type="button" onClick={resetPresetForm} className="text-muted text-sm">取消</button>
+              </div>
+            </form>
+          )}
+
+          <div className="space-y-2">
+            {presets.map((p) => {
+              const pArrs = arrangements.filter((a) => a.cord_preset_id === p.id);
+              return (
+                <div key={p.id} className="border border-border rounded-lg p-3 bg-background">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="font-medium">{p.knot_type}</span>
+                      {p.description && <span className="text-xs text-muted ml-2">{p.description}</span>}
+                    </div>
+                    <div className="flex gap-2">
+                      <button onClick={() => handleEditPreset(p)} className="text-primary text-xs">編輯</button>
+                      <button onClick={() => handleDeletePreset(p.id)} className="text-red-400 text-xs">刪除</button>
+                    </div>
+                  </div>
+                  {/* Arrangements for this knot */}
+                  {pArrs.length > 0 && (
+                    <div className="mt-2 space-y-1">
+                      {pArrs.map((a) => (
+                        <div key={a.id} className="flex items-center justify-between text-xs bg-card rounded px-2 py-1.5">
+                          <span>
+                            <strong>{a.name}</strong>
+                            <span className="text-muted ml-2">
+                              {cordNames[0]}:x{a.cord1_multiplier} / {cordNames[1]}:x{a.cord2_multiplier} / {cordNames[2]}:x{a.cord3_multiplier}
+                            </span>
+                          </span>
+                          <div className="flex gap-2">
+                            <button onClick={() => handleEditArr(a)} className="text-primary">編輯</button>
+                            <button onClick={() => handleDeleteArr(a.id)} className="text-red-400">刪除</button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </div>
 
-        {showPresetForm && (
-          <form onSubmit={handleSubmitPreset} className="border border-border rounded-lg p-4 mb-4 space-y-3 bg-background">
-            <h3 className="text-sm font-medium">{editingPreset ? "編輯結型" : "新增結型"}</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div>
-                <label className="block text-xs text-muted mb-1">結型名稱 *</label>
-                <input
-                  required
-                  className={INPUT_CLASS}
-                  value={presetForm.knot_type}
-                  onChange={(e) => setPresetForm({ ...presetForm, knot_type: e.target.value })}
-                  placeholder="例：平結"
-                />
-              </div>
-              <div>
-                <label className="block text-xs text-muted mb-1">倍率 *</label>
-                <input
-                  required
-                  type="number"
-                  step="0.1"
-                  className={INPUT_CLASS}
-                  value={presetForm.multiplier}
-                  onChange={(e) => setPresetForm({ ...presetForm, multiplier: e.target.value })}
-                  placeholder="例：4.0"
-                />
-              </div>
-              <div>
-                <label className="block text-xs text-muted mb-1">說明</label>
-                <input
-                  className={INPUT_CLASS}
-                  value={presetForm.description}
-                  onChange={(e) => setPresetForm({ ...presetForm, description: e.target.value })}
-                  placeholder="例：成品長度 x 4"
-                />
-              </div>
-            </div>
-            <div className="flex gap-2">
-              <button type="submit" className="bg-primary text-white px-4 py-1 rounded-lg text-sm hover:bg-accent">
-                {editingPreset ? "更新" : "新增"}
-              </button>
-              <button type="button" onClick={resetPresetForm} className="text-muted text-sm">
-                取消
-              </button>
-            </div>
-          </form>
-        )}
+        {/* Arrangement form */}
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-lg font-semibold text-primary">搭配方式管理</h3>
+            <button
+              onClick={() => { resetArrForm(); setShowArrForm(true); }}
+              className="bg-primary text-white px-4 py-1.5 rounded-lg text-sm hover:bg-accent transition-colors"
+            >
+              + 新增搭配
+            </button>
+          </div>
 
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-border">
-              <th className="text-left py-2">結型</th>
-              <th className="text-right py-2">倍率</th>
-              <th className="text-left py-2 pl-4">說明</th>
-              <th className="text-right py-2">操作</th>
-            </tr>
-          </thead>
-          <tbody>
-            {presets.map((p) => (
-              <tr key={p.id} className="border-b border-border last:border-0 hover:bg-background/50">
-                <td className="py-2 font-medium">{p.knot_type}</td>
-                <td className="text-right py-2">x {p.multiplier}</td>
-                <td className="py-2 pl-4 text-muted">{p.description}</td>
-                <td className="py-2 text-right">
-                  <button
-                    onClick={() => handleEditPreset(p)}
-                    className="text-primary hover:text-accent text-xs mr-2"
-                  >
-                    編輯
-                  </button>
-                  <button
-                    onClick={() => handleDeletePreset(p.id)}
-                    className="text-red-400 hover:text-red-600 text-xs"
-                  >
-                    刪除
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+          {showArrForm && (
+            <form onSubmit={handleSubmitArr} className="border border-border rounded-lg p-4 space-y-3 bg-background">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs text-muted mb-1">結型 *</label>
+                  <select required className={INPUT_CLASS} value={arrForm.cord_preset_id}
+                    onChange={(e) => setArrForm({ ...arrForm, cord_preset_id: e.target.value })}>
+                    <option value="">選擇結型</option>
+                    {presets.map((p) => <option key={p.id} value={p.id}>{p.knot_type}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs text-muted mb-1">搭配名稱 *</label>
+                  <input required className={INPUT_CLASS} value={arrForm.name}
+                    onChange={(e) => setArrForm({ ...arrForm, name: e.target.value })}
+                    placeholder="例：芯線在中" />
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-xs text-muted mb-1">{cordNames[0]} 倍率 *</label>
+                  <input required type="number" step="0.1" className={INPUT_CLASS} value={arrForm.cord1_multiplier}
+                    onChange={(e) => setArrForm({ ...arrForm, cord1_multiplier: e.target.value })} placeholder="例：1" />
+                </div>
+                <div>
+                  <label className="block text-xs text-muted mb-1">{cordNames[1]} 倍率 *</label>
+                  <input required type="number" step="0.1" className={INPUT_CLASS} value={arrForm.cord2_multiplier}
+                    onChange={(e) => setArrForm({ ...arrForm, cord2_multiplier: e.target.value })} placeholder="例：4" />
+                </div>
+                <div>
+                  <label className="block text-xs text-muted mb-1">{cordNames[2]} 倍率 *</label>
+                  <input required type="number" step="0.1" className={INPUT_CLASS} value={arrForm.cord3_multiplier}
+                    onChange={(e) => setArrForm({ ...arrForm, cord3_multiplier: e.target.value })} placeholder="例：4" />
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <button type="submit" className="bg-primary text-white px-4 py-1 rounded-lg text-sm">{editingArr ? "更新" : "新增"}</button>
+                <button type="button" onClick={resetArrForm} className="text-muted text-sm">取消</button>
+              </div>
+            </form>
+          )}
+        </div>
       </div>
     </div>
   );
