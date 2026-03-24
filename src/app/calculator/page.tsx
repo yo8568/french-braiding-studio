@@ -10,6 +10,9 @@ interface CordPreset {
   knot_type: string;
   multiplier: number;
   description: string;
+  cord1_multiplier: number;
+  cord2_multiplier: number;
+  cord3_multiplier: number;
 }
 
 interface Arrangement {
@@ -50,7 +53,10 @@ export default function CalculatorPage() {
   // Preset management
   const [showPresetForm, setShowPresetForm] = useState(false);
   const [editingPreset, setEditingPreset] = useState<CordPreset | null>(null);
-  const [presetForm, setPresetForm] = useState({ knot_type: "", multiplier: "", description: "" });
+  const [presetForm, setPresetForm] = useState({
+    knot_type: "", multiplier: "", description: "",
+    cord1_multiplier: "", cord2_multiplier: "", cord3_multiplier: "",
+  });
 
   // Arrangement management
   const [showArrForm, setShowArrForm] = useState(false);
@@ -87,13 +93,18 @@ export default function CalculatorPage() {
 
   // --- Preset CRUD ---
   function resetPresetForm() {
-    setPresetForm({ knot_type: "", multiplier: "", description: "" });
+    setPresetForm({ knot_type: "", multiplier: "", description: "", cord1_multiplier: "", cord2_multiplier: "", cord3_multiplier: "" });
     setEditingPreset(null);
     setShowPresetForm(false);
   }
 
   function handleEditPreset(p: CordPreset) {
-    setPresetForm({ knot_type: p.knot_type, multiplier: p.multiplier.toString(), description: p.description ?? "" });
+    setPresetForm({
+      knot_type: p.knot_type, multiplier: p.multiplier.toString(), description: p.description ?? "",
+      cord1_multiplier: p.cord1_multiplier?.toString() ?? "",
+      cord2_multiplier: p.cord2_multiplier?.toString() ?? "",
+      cord3_multiplier: p.cord3_multiplier?.toString() ?? "",
+    });
     setEditingPreset(p);
     setShowPresetForm(true);
   }
@@ -103,8 +114,11 @@ export default function CalculatorPage() {
     if (!presetForm.knot_type.trim() || !presetForm.multiplier) return;
     const payload = {
       knot_type: presetForm.knot_type.trim(),
-      multiplier: parseFloat(presetForm.multiplier),
+      multiplier: parseFloat(presetForm.multiplier) || 0,
       description: presetForm.description || null,
+      cord1_multiplier: parseFloat(presetForm.cord1_multiplier) || 0,
+      cord2_multiplier: parseFloat(presetForm.cord2_multiplier) || 0,
+      cord3_multiplier: parseFloat(presetForm.cord3_multiplier) || 0,
     };
     if (editingPreset) {
       await supabase.from("cord_presets").update(payload).eq("id", editingPreset.id);
@@ -173,8 +187,16 @@ export default function CalculatorPage() {
   }
 
   function handleSelectKnot(i: number, knotType: string) {
+    const preset = presets.find((p) => p.knot_type === knotType);
     const updated = [...sections];
-    updated[i] = { ...updated[i], knot_type: knotType, arrangement_id: "", cord1_mult: "", cord2_mult: "", cord3_mult: "" };
+    updated[i] = {
+      ...updated[i],
+      knot_type: knotType,
+      arrangement_id: "",
+      cord1_mult: preset?.cord1_multiplier?.toString() ?? "",
+      cord2_mult: preset?.cord2_multiplier?.toString() ?? "",
+      cord3_mult: preset?.cord3_multiplier?.toString() ?? "",
+    };
     setSections(updated);
   }
 
@@ -314,6 +336,7 @@ export default function CalculatorPage() {
                       }`}
                     >
                       {p.knot_type}
+                      <span className="opacity-70 ml-0.5">({p.cord1_multiplier}/{p.cord2_multiplier}/{p.cord3_multiplier})</span>
                     </button>
                   ))}
                 </div>
@@ -473,6 +496,23 @@ export default function CalculatorPage() {
                     onChange={(e) => setPresetForm({ ...presetForm, description: e.target.value })} />
                 </div>
               </div>
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-xs text-muted mb-1">{getCordName(0)} 倍率</label>
+                  <input type="number" step="0.1" className={INPUT_CLASS} value={presetForm.cord1_multiplier}
+                    onChange={(e) => setPresetForm({ ...presetForm, cord1_multiplier: e.target.value })} placeholder="例：1" />
+                </div>
+                <div>
+                  <label className="block text-xs text-muted mb-1">{getCordName(1)} 倍率</label>
+                  <input type="number" step="0.1" className={INPUT_CLASS} value={presetForm.cord2_multiplier}
+                    onChange={(e) => setPresetForm({ ...presetForm, cord2_multiplier: e.target.value })} placeholder="例：4" />
+                </div>
+                <div>
+                  <label className="block text-xs text-muted mb-1">{getCordName(2)} 倍率</label>
+                  <input type="number" step="0.1" className={INPUT_CLASS} value={presetForm.cord3_multiplier}
+                    onChange={(e) => setPresetForm({ ...presetForm, cord3_multiplier: e.target.value })} placeholder="例：4" />
+                </div>
+              </div>
               <div className="flex gap-2">
                 <button type="submit" className="bg-primary text-white px-4 py-1 rounded-lg text-sm">{editingPreset ? "更新" : "新增"}</button>
                 <button type="button" onClick={resetPresetForm} className="text-muted text-sm">取消</button>
@@ -488,7 +528,10 @@ export default function CalculatorPage() {
                   <div className="flex items-center justify-between">
                     <div>
                       <span className="font-medium">{p.knot_type}</span>
-                      {p.description && <span className="text-xs text-muted ml-2">{p.description}</span>}
+                      <span className="text-xs text-muted ml-2">
+                        ({p.cord1_multiplier}/{p.cord2_multiplier}/{p.cord3_multiplier})
+                      </span>
+                      {p.description && <span className="text-xs text-muted ml-1">{p.description}</span>}
                     </div>
                     <div className="flex gap-2">
                       <button onClick={() => handleEditPreset(p)} className="text-primary text-xs">編輯</button>
