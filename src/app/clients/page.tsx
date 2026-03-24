@@ -14,6 +14,7 @@ import {
 import { uploadImages } from "@/lib/upload";
 import type { Client, ClientNote, Work } from "@/lib/types";
 import Modal from "@/app/components/Modal";
+import Lightbox from "@/app/components/Lightbox";
 
 export default function ClientsPage() {
   const supabase = createClient();
@@ -25,6 +26,7 @@ export default function ClientsPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [noteForm, setNoteForm] = useState<{ clientId: string; type: ClientNote["type"]; content: string; images: File[] } | null>(null);
+  const [lightbox, setLightbox] = useState<{ images: string[]; index: number } | null>(null);
   const [form, setForm] = useState({
     name: "",
     social_media_type: "ig" as "ig" | "line" | "fb",
@@ -535,7 +537,7 @@ export default function ClientsPage() {
                                         src={url}
                                         alt={`紀錄圖片 ${i + 1}`}
                                         className="w-20 h-20 object-cover rounded border border-border cursor-pointer hover:opacity-80"
-                                        onClick={() => window.open(url, "_blank")}
+                                        onClick={() => setLightbox({ images: note.image_urls, index: i })}
                                       />
                                     ))}
                                   </div>
@@ -558,6 +560,14 @@ export default function ClientsPage() {
             );
           })}
         </div>
+      )}
+
+      {lightbox && (
+        <Lightbox
+          images={lightbox.images}
+          initialIndex={lightbox.index}
+          onClose={() => setLightbox(null)}
+        />
       )}
     </div>
   );

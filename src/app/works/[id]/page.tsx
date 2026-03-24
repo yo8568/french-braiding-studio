@@ -6,6 +6,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase";
 import { WORK_STATUS_LABELS } from "@/lib/constants";
 import type { Work, WorkThread, WorkTechnique } from "@/lib/types";
+import Lightbox from "@/app/components/Lightbox";
 
 export default function WorkDetailPage() {
   const params = useParams<{ id: string }>();
@@ -13,6 +14,7 @@ export default function WorkDetailPage() {
   const [workThreads, setWorkThreads] = useState<WorkThread[]>([]);
   const [workTechniques, setWorkTechniques] = useState<WorkTechnique[]>([]);
   const [loading, setLoading] = useState(true);
+  const [lightbox, setLightbox] = useState<{ images: string[]; index: number } | null>(null);
 
   useEffect(() => {
     const supabase = createClient();
@@ -85,7 +87,8 @@ export default function WorkDetailPage() {
               key={i}
               src={url}
               alt={`${work.name} ${i + 1}`}
-              className="w-full h-64 object-cover rounded-xl border border-border"
+              className="w-full h-64 object-cover rounded-xl border border-border cursor-pointer hover:opacity-80 transition-opacity"
+              onClick={() => setLightbox({ images: work.image_urls, index: i })}
             />
           ))}
         </div>
@@ -226,6 +229,14 @@ export default function WorkDetailPage() {
           </div>
         )}
       </div>
+
+      {lightbox && (
+        <Lightbox
+          images={lightbox.images}
+          initialIndex={lightbox.index}
+          onClose={() => setLightbox(null)}
+        />
+      )}
     </div>
   );
 }

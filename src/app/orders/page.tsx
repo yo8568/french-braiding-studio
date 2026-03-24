@@ -14,6 +14,7 @@ import {
 import { uploadImages } from "@/lib/upload";
 import type { Client, Order, OrderItem, Work, ClientNote } from "@/lib/types";
 import Modal from "@/app/components/Modal";
+import Lightbox from "@/app/components/Lightbox";
 
 export default function OrdersPage() {
   const supabase = createClient();
@@ -23,6 +24,7 @@ export default function OrdersPage() {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [lightbox, setLightbox] = useState<{ images: string[]; index: number } | null>(null);
   const [orderNotes, setOrderNotes] = useState<Record<string, ClientNote[]>>({});
   const [noteForm, setNoteForm] = useState<{
     orderId: string;
@@ -619,7 +621,7 @@ export default function OrdersPage() {
                                           src={url}
                                           alt={`回饋圖片 ${i + 1}`}
                                           className="w-16 h-16 object-cover rounded border border-border cursor-pointer hover:opacity-80"
-                                          onClick={() => window.open(url, "_blank")}
+                                          onClick={() => setLightbox({ images: note.image_urls, index: i })}
                                         />
                                       ))}
                                     </div>
@@ -643,6 +645,14 @@ export default function OrdersPage() {
             );
           })}
         </div>
+      )}
+
+      {lightbox && (
+        <Lightbox
+          images={lightbox.images}
+          initialIndex={lightbox.index}
+          onClose={() => setLightbox(null)}
+        />
       )}
     </div>
   );
