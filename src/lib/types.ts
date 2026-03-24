@@ -107,6 +107,16 @@ export interface WorkTechnique {
   technique?: Technique;
 }
 
+export interface Feedback {
+  id: string;
+  page: string;
+  category: "bug" | "suggestion" | "question" | "other";
+  content: string;
+  status: "open" | "resolved";
+  created_at: string;
+  resolved_at?: string;
+}
+
 export interface CordCalculation {
   knot_type: string;
   finished_length_cm: number;

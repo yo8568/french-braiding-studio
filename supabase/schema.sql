@@ -120,6 +120,20 @@ INSERT INTO cord_presets (knot_type, multiplier, description) VALUES
   ('中國結', 7.0, '成品長度 x 7 = 所需繩長'),
   ('纏繞編', 3.0, '成品長度 x 3 = 所需繩長');
 
+-- 意見回饋
+CREATE TABLE feedback (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  page TEXT NOT NULL,
+  category TEXT NOT NULL DEFAULT 'suggestion' CHECK (category IN ('bug', 'suggestion', 'question', 'other')),
+  content TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'resolved')),
+  created_at TIMESTAMPTZ DEFAULT now(),
+  resolved_at TIMESTAMPTZ
+);
+
+CREATE INDEX idx_feedback_status ON feedback(status);
+CREATE INDEX idx_feedback_page ON feedback(page);
+
 -- Storage bucket for images (run in Supabase dashboard or via API)
 -- INSERT INTO storage.buckets (id, name, public) VALUES ('work-images', 'work-images', true);
 
@@ -139,3 +153,5 @@ CREATE POLICY "Allow all" ON work_threads FOR ALL USING (true) WITH CHECK (true)
 CREATE POLICY "Allow all" ON techniques FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow all" ON work_techniques FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow all" ON cord_presets FOR ALL USING (true) WITH CHECK (true);
+ALTER TABLE feedback ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all" ON feedback FOR ALL USING (true) WITH CHECK (true);

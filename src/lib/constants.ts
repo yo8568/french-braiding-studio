@@ -39,5 +39,23 @@ export const NOTE_TYPE_LABELS: Record<string, string> = {
   other: "其他",
 };
 
+// Feedback category labels
+export const FEEDBACK_CATEGORY_LABELS: Record<string, string> = {
+  bug: "問題回報",
+  suggestion: "建議",
+  question: "提問",
+  other: "其他",
+};
+
+export const FEEDBACK_STATUS_LABELS: Record<string, string> = {
+  open: "待處理",
+  resolved: "已解決",
+};
+
+export const FEEDBACK_STATUS_COLORS: Record<string, string> = {
+  open: "bg-yellow-100 text-yellow-800",
+  resolved: "bg-green-100 text-green-800",
+};
+
 // Convenience store options
 export const CONVENIENCE_STORES = ["7-ELEVEN", "全家", "萊爾富", "OK超商"];

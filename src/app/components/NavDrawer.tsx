@@ -11,6 +11,7 @@ const navItems = [
   { href: "/clients", label: "客戶管理" },
   { href: "/threads", label: "線材管理" },
   { href: "/calculator", label: "繩長計算機" },
+  { href: "/feedback", label: "意見回饋" },
 ];
 
 export default function NavDrawer() {

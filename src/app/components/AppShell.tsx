@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 import { AuthProvider } from "@/lib/auth";
 import AuthGuard from "./AuthGuard";
 import NavDrawer from "./NavDrawer";
+import FeedbackWidget from "./FeedbackWidget";
 import { useAuth } from "@/lib/auth";
 
 function LogoutButton() {
@@ -46,6 +47,7 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
       <footer className="border-t border-border bg-card py-4 text-center text-sm text-muted">
         法式編織工作室 &copy; {new Date().getFullYear()}
       </footer>
+      <FeedbackWidget />
     </>
   );
 }
