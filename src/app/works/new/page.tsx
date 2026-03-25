@@ -5,9 +5,9 @@ import { usePageShow } from "@/lib/usePageShow";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase";
 import { uploadImages } from "@/lib/upload";
-import { buildWorkPayload, saveWorkThreads, saveWorkTechniques, addClient, addThread } from "@/lib/work-helpers";
+import { buildWorkPayload, saveWorkThreads, saveWorkTechniques, saveWorkHardware, addClient, addThread } from "@/lib/work-helpers";
 import { INPUT_CLASS } from "@/lib/constants";
-import type { Client, Thread, Technique } from "@/lib/types";
+import type { Client, Thread, Technique, Hardware } from "@/lib/types";
 import {
   EMPTY_WORK_FORM,
   EMPTY_NEW_THREAD,
@@ -15,9 +15,12 @@ import {
   ThreadsSection,
   TechniquesSection,
   DetailsSection,
+  MemoSection,
+  HardwareSection,
   type WorkFormData,
   type ThreadRow,
   type TechniqueRow,
+  type HardwareRow,
 } from "@/app/components/WorkFormSections";
 
 export default function NewWorkPage() {
@@ -26,11 +29,13 @@ export default function NewWorkPage() {
   const [clients, setClients] = useState<Client[]>([]);
   const [threads, setThreads] = useState<Thread[]>([]);
   const [techniques, setTechniques] = useState<Technique[]>([]);
+  const [hardwareList, setHardwareList] = useState<Hardware[]>([]);
   const [saving, setSaving] = useState(false);
 
   const [form, setForm] = useState<WorkFormData>(EMPTY_WORK_FORM);
   const [selectedThreads, setSelectedThreads] = useState<ThreadRow[]>([]);
   const [selectedTechniques, setSelectedTechniques] = useState<TechniqueRow[]>([]);
+  const [selectedHardware, setSelectedHardware] = useState<HardwareRow[]>([]);
   const [imageFiles, setImageFiles] = useState<File[]>([]);
 
   // Inline creation state
@@ -42,14 +47,16 @@ export default function NewWorkPage() {
   usePageShow(() => {
     const supabase = createClient();
     async function load() {
-      const [c, t, tech] = await Promise.all([
+      const [c, t, tech, hw] = await Promise.all([
         supabase.from("clients").select("*").order("name"),
         supabase.from("threads").select("*").order("color_name"),
         supabase.from("techniques").select("*").order("name"),
+        supabase.from("hardware").select("*").order("name"),
       ]);
       setClients(c.data ?? []);
       setThreads(t.data ?? []);
       setTechniques(tech.data ?? []);
+      setHardwareList(hw.data ?? []);
     }
     load();
   });
@@ -91,9 +98,11 @@ export default function NewWorkPage() {
 
       if (error) throw error;
 
+      const shouldDeductStock = form.status === "in_progress";
       await Promise.all([
-        saveWorkThreads(work.id, selectedThreads),
+        saveWorkThreads(work.id, selectedThreads, shouldDeductStock),
         saveWorkTechniques(work.id, selectedTechniques),
+        saveWorkHardware(work.id, selectedHardware),
       ]);
 
       router.push(`/works/${work.id}`);
@@ -137,6 +146,8 @@ export default function NewWorkPage() {
           )}
         </section>
 
+        <MemoSection form={form} setForm={setForm} />
+
         <ThreadsSection
           threads={threads}
           selectedThreads={selectedThreads}
@@ -152,6 +163,12 @@ export default function NewWorkPage() {
           techniques={techniques}
           selectedTechniques={selectedTechniques}
           setSelectedTechniques={setSelectedTechniques}
+        />
+
+        <HardwareSection
+          hardware={hardwareList}
+          selectedHardware={selectedHardware}
+          setSelectedHardware={setSelectedHardware}
         />
 
         <DetailsSection form={form} setForm={setForm} />

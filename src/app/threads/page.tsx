@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { usePageShow } from "@/lib/usePageShow";
 import { createClient } from "@/lib/supabase";
 import { INPUT_CLASS, THREAD_SOURCE_PRESETS, THREAD_THICKNESS_OPTIONS } from "@/lib/constants";
-import type { Thread } from "@/lib/types";
+import type { Thread, ThreadPurchase } from "@/lib/types";
 import Modal from "@/app/components/Modal";
+import Pagination, { paginate } from "@/app/components/Pagination";
 
 export default function ThreadsPage() {
   const supabase = createClient();
@@ -19,11 +20,15 @@ export default function ThreadsPage() {
     material: "包芯棉",
     thickness_mm: "",
     source: "",
-    price: "",
-    stock_length_cm: "",
   });
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
   const [addStockId, setAddStockId] = useState<string | null>(null);
   const [addStockLength, setAddStockLength] = useState("");
+  const [addStockPrice, setAddStockPrice] = useState("");
+  const [purchases, setPurchases] = useState<Record<string, ThreadPurchase[]>>({});
+  const [expandedPurchaseId, setExpandedPurchaseId] = useState<string | null>(null);
+  const [editingPurchase, setEditingPurchase] = useState<{ id: string; threadId: string; length_cm: string; price: string } | null>(null);
   const [showCsvUpload, setShowCsvUpload] = useState(false);
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [csvUploading, setCsvUploading] = useState(false);
@@ -34,16 +39,22 @@ export default function ThreadsPage() {
   });
 
   async function loadThreads() {
-    const { data } = await supabase
-      .from("threads")
-      .select("*")
-      .order("color_name");
-    setThreads((data as Thread[]) ?? []);
+    const [threadsRes, purchasesRes] = await Promise.all([
+      supabase.from("threads").select("*").order("color_name"),
+      supabase.from("thread_purchases").select("*").order("created_at", { ascending: false }),
+    ]);
+    setThreads((threadsRes.data as Thread[]) ?? []);
+    // Group purchases by thread_id
+    const grouped: Record<string, ThreadPurchase[]> = {};
+    for (const p of (purchasesRes.data as ThreadPurchase[]) ?? []) {
+      (grouped[p.thread_id] ??= []).push(p);
+    }
+    setPurchases(grouped);
     setLoading(false);
   }
 
   function resetForm() {
-    setForm({ color_name: "", color_hex: "#000000", material: "包芯棉", thickness_mm: "", source: "", price: "", stock_length_cm: "" });
+    setForm({ color_name: "", color_hex: "#000000", material: "包芯棉", thickness_mm: "", source: "" });
     setEditingId(null);
     setShowForm(false);
   }
@@ -55,8 +66,6 @@ export default function ThreadsPage() {
       material: thread.material ?? "",
       thickness_mm: thread.thickness_mm?.toString() ?? "",
       source: thread.source ?? "",
-      price: thread.price?.toString() ?? "",
-      stock_length_cm: thread.stock_length_cm?.toString() ?? "",
     });
     setEditingId(thread.id);
     setShowForm(true);
@@ -72,8 +81,6 @@ export default function ThreadsPage() {
       material: form.material || null,
       thickness_mm: form.thickness_mm ? parseFloat(form.thickness_mm) : null,
       source: form.source || null,
-      price: form.price ? parseFloat(form.price) : null,
-      stock_length_cm: form.stock_length_cm ? parseFloat(form.stock_length_cm) : 0,
     };
 
     if (editingId) {
@@ -86,15 +93,42 @@ export default function ThreadsPage() {
     loadThreads();
   }
 
+  function togglePurchaseLog(threadId: string) {
+    setExpandedPurchaseId(expandedPurchaseId === threadId ? null : threadId);
+  }
+
+  async function handleEditPurchase() {
+    if (!editingPurchase) return;
+    const length = parseFloat(editingPurchase.length_cm);
+    const price = parseFloat(editingPurchase.price);
+    if (!length || length <= 0 || !price || price <= 0) return;
+
+    await supabase.from("thread_purchases").update({ length_cm: length, price }).eq("id", editingPurchase.id);
+    const tid = editingPurchase.threadId;
+    setEditingPurchase(null);
+    setExpandedPurchaseId(tid);
+    loadThreads();
+  }
+
+  async function handleDeletePurchase(purchase: ThreadPurchase) {
+    if (!confirm("確定要刪除這筆進貨紀錄？")) return;
+    await supabase.from("thread_purchases").delete().eq("id", purchase.id);
+    setExpandedPurchaseId(purchase.thread_id);
+    loadThreads();
+  }
+
   async function handleAddStock(threadId: string) {
     const length = parseFloat(addStockLength);
-    if (!length || length <= 0) return;
-    const thread = threads.find((t) => t.id === threadId);
-    if (!thread) return;
-    const newStock = (thread.stock_length_cm ?? 0) + length;
-    await supabase.from("threads").update({ stock_length_cm: newStock }).eq("id", threadId);
+    const price = parseFloat(addStockPrice);
+    if (!length || length <= 0 || !price || price <= 0) return;
+    await supabase.from("thread_purchases").insert({
+      thread_id: threadId,
+      length_cm: length,
+      price,
+    });
     setAddStockId(null);
     setAddStockLength("");
+    setAddStockPrice("");
     loadThreads();
   }
 
@@ -185,6 +219,18 @@ export default function ThreadsPage() {
     }
   }
 
+  const filteredThreads = useMemo(() => {
+    if (!search.trim()) return threads;
+    const q = search.trim().toLowerCase();
+    return threads.filter(
+      (t) =>
+        t.color_name.toLowerCase().includes(q) ||
+        (t.material?.toLowerCase().includes(q)) ||
+        (t.source?.toLowerCase().includes(q)) ||
+        t.color_hex.toLowerCase().includes(q)
+    );
+  }, [threads, search]);
+
   if (loading)
     return <div className="text-center py-16 text-muted">載入中...</div>;
 
@@ -213,6 +259,16 @@ export default function ThreadsPage() {
             + 新增線材
           </button>
         </div>
+      </div>
+
+      {/* Search */}
+      <div className="mb-6">
+        <input
+          className={INPUT_CLASS}
+          value={search}
+          onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+          placeholder="搜尋顏色、材質、來源..."
+        />
       </div>
 
       {/* CSV Upload Modal */}
@@ -334,28 +390,6 @@ export default function ThreadsPage() {
                 ))}
               </datalist>
             </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">購入價格 (NT$)</label>
-              <input
-                type="number"
-                step="1"
-                className={INPUT_CLASS}
-                value={form.price}
-                onChange={(e) => setForm({ ...form, price: e.target.value })}
-                placeholder="例：120"
-              />
-            </div>
-            <div className="sm:col-span-2">
-              <label className="block text-sm font-medium mb-1">庫存線長 (cm)</label>
-              <input
-                type="number"
-                step="0.1"
-                className={INPUT_CLASS}
-                value={form.stock_length_cm}
-                onChange={(e) => setForm({ ...form, stock_length_cm: e.target.value })}
-                placeholder="例：500"
-              />
-            </div>
           </div>
           <div className="flex gap-3">
             <button
@@ -376,11 +410,13 @@ export default function ThreadsPage() {
       </Modal>
 
       {/* Thread list */}
-      {threads.length === 0 ? (
-        <div className="text-center py-16 text-muted">尚無線材</div>
-      ) : (
+      {filteredThreads.length === 0 ? (
+        <div className="text-center py-16 text-muted">{search ? "無符合結果" : "尚無線材"}</div>
+      ) : (() => {
+        const { paged: pagedThreads, totalPages } = paginate(filteredThreads, page);
+        return (<>
         <div className="space-y-3">
-          {threads.map((thread) => (
+          {pagedThreads.map((thread) => (
             <div
               key={thread.id}
               className="bg-card border border-border rounded-xl p-4"
@@ -406,7 +442,6 @@ export default function ThreadsPage() {
                   </div>
                   <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1 text-sm text-muted">
                     {thread.source && <span>來源：{thread.source}</span>}
-                    {thread.price && <span>價格：NT${thread.price}</span>}
                   </div>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
@@ -428,7 +463,16 @@ export default function ThreadsPage() {
               {/* Row 2: stock */}
               <div className="mt-3 pt-3 border-t border-border flex items-center justify-between">
                 <span className="text-sm">
-                  庫存：<span className="font-medium">{thread.stock_length_cm ? `${thread.stock_length_cm} cm` : "0 cm"}</span>
+                  {(() => {
+                    const ps = purchases[thread.id] ?? [];
+                    const totalLen = ps.reduce((s, p) => s + p.length_cm, 0);
+                    const totalSpent = ps.reduce((s, p) => s + p.price, 0);
+                    const avg = totalLen > 0 ? totalSpent / totalLen : 0;
+                    return (<>
+                      庫存：<span className="font-medium">{totalLen ? `${totalLen} cm` : "0 cm"}</span>
+                      {avg > 0 && <span className="text-muted ml-2">（均價 {avg.toFixed(2)} /cm）</span>}
+                    </>);
+                  })()}
                 </span>
                 {addStockId === thread.id ? (
                   <div className="flex items-center gap-2">
@@ -438,8 +482,16 @@ export default function ThreadsPage() {
                       className="w-24 border border-border rounded-lg px-3 py-1.5 text-sm bg-card"
                       value={addStockLength}
                       onChange={(e) => setAddStockLength(e.target.value)}
-                      placeholder="新增 cm"
+                      placeholder="長度 cm"
                       autoFocus
+                    />
+                    <input
+                      type="number"
+                      step="1"
+                      className="w-24 border border-border rounded-lg px-3 py-1.5 text-sm bg-card"
+                      value={addStockPrice}
+                      onChange={(e) => setAddStockPrice(e.target.value)}
+                      placeholder="價格 NT$"
                     />
                     <button
                       onClick={() => handleAddStock(thread.id)}
@@ -448,25 +500,100 @@ export default function ThreadsPage() {
                       加入
                     </button>
                     <button
-                      onClick={() => { setAddStockId(null); setAddStockLength(""); }}
+                      onClick={() => { setAddStockId(null); setAddStockLength(""); setAddStockPrice(""); }}
                       className="text-sm text-muted hover:text-primary"
                     >
                       取消
                     </button>
                   </div>
                 ) : (
-                  <button
-                    onClick={() => setAddStockId(thread.id)}
-                    className="text-sm text-primary hover:text-accent"
-                  >
-                    + 補貨
-                  </button>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => togglePurchaseLog(thread.id)}
+                      className="text-xs text-muted hover:text-primary"
+                    >
+                      {expandedPurchaseId === thread.id ? "隱藏紀錄 ▲" : "進貨紀錄 ▼"}
+                    </button>
+                    <button
+                      onClick={() => setAddStockId(thread.id)}
+                      className="text-sm text-primary hover:text-accent"
+                    >
+                      + 補貨
+                    </button>
+                  </div>
                 )}
               </div>
+
+              {/* Purchase log */}
+              {expandedPurchaseId === thread.id && (
+                <div className="mt-2 pt-2 border-t border-border">
+                  {(!purchases[thread.id] || purchases[thread.id].length === 0) ? (
+                    <p className="text-xs text-muted">尚無進貨紀錄</p>
+                  ) : (
+                    <div className="space-y-1">
+                      <div className="flex items-center text-xs text-muted gap-3 px-2">
+                        <span className="w-24">日期</span>
+                        <span className="w-20 text-right">長度</span>
+                        <span className="w-20 text-right">價格</span>
+                        <span className="w-20 text-right">單價/cm</span>
+                        <span className="w-16 text-right">操作</span>
+                      </div>
+                      {purchases[thread.id].map((p) =>
+                        editingPurchase?.id === p.id ? (
+                          <div key={p.id} className="flex items-center text-xs gap-2 px-2 py-1 bg-background rounded">
+                            <span className="w-24 text-muted">{new Date(p.created_at).toLocaleDateString("zh-TW")}</span>
+                            <input
+                              type="number" step="0.1"
+                              className="w-20 border border-border rounded px-1 py-0.5 text-right bg-card"
+                              value={editingPurchase.length_cm}
+                              onChange={(e) => setEditingPurchase({ ...editingPurchase, length_cm: e.target.value })}
+                            />
+                            <input
+                              type="number" step="1"
+                              className="w-20 border border-border rounded px-1 py-0.5 text-right bg-card"
+                              value={editingPurchase.price}
+                              onChange={(e) => setEditingPurchase({ ...editingPurchase, price: e.target.value })}
+                            />
+                            <button onClick={handleEditPurchase} className="text-green-600 hover:text-green-700">儲存</button>
+                            <button onClick={() => setEditingPurchase(null)} className="text-muted hover:text-primary">取消</button>
+                          </div>
+                        ) : (
+                          <div key={p.id} className="flex items-center text-xs gap-3 px-2 py-1 rounded hover:bg-background">
+                            <span className="w-24 text-muted">
+                              {new Date(p.created_at).toLocaleDateString("zh-TW")}
+                            </span>
+                            <span className="w-20 text-right">{p.length_cm} cm</span>
+                            <span className="w-20 text-right">NT${p.price}</span>
+                            <span className="w-20 text-right text-muted">
+                              {(p.price / p.length_cm).toFixed(2)}/cm
+                            </span>
+                            <span className="w-16 text-right flex gap-1 justify-end">
+                              <button
+                                onClick={() => setEditingPurchase({ id: p.id, threadId: thread.id, length_cm: p.length_cm.toString(), price: p.price.toString() })}
+                                className="text-primary hover:text-accent"
+                              >
+                                編輯
+                              </button>
+                              <button
+                                onClick={() => handleDeletePurchase(p)}
+                                className="text-red-400 hover:text-red-600"
+                              >
+                                刪除
+                              </button>
+                            </span>
+                          </div>
+                        )
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           ))}
         </div>
-      )}
+        <Pagination currentPage={page} totalPages={totalPages} onPageChange={setPage} />
+        </>);
+      })()}
     </div>
   );
 }

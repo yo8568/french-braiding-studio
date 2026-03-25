@@ -4,9 +4,9 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase";
 import { uploadImages } from "@/lib/upload";
-import { buildWorkPayload, saveWorkThreads, saveWorkTechniques, addClient, addThread } from "@/lib/work-helpers";
+import { buildWorkPayload, saveWorkThreads, saveWorkTechniques, saveWorkHardware, restoreThreadStock, restoreHardwareStock, addClient, addThread } from "@/lib/work-helpers";
 import { INPUT_CLASS } from "@/lib/constants";
-import type { Client, Thread, Technique } from "@/lib/types";
+import type { Client, Thread, Technique, Hardware } from "@/lib/types";
 import {
   EMPTY_WORK_FORM,
   EMPTY_NEW_THREAD,
@@ -14,9 +14,12 @@ import {
   ThreadsSection,
   TechniquesSection,
   DetailsSection,
+  MemoSection,
+  HardwareSection,
   type WorkFormData,
   type ThreadRow,
   type TechniqueRow,
+  type HardwareRow,
 } from "@/app/components/WorkFormSections";
 
 export default function EditWorkPage() {
@@ -26,12 +29,15 @@ export default function EditWorkPage() {
   const [clients, setClients] = useState<Client[]>([]);
   const [threads, setThreads] = useState<Thread[]>([]);
   const [techniques, setTechniques] = useState<Technique[]>([]);
+  const [hardwareList, setHardwareList] = useState<Hardware[]>([]);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const [form, setForm] = useState<WorkFormData>(EMPTY_WORK_FORM);
   const [selectedThreads, setSelectedThreads] = useState<ThreadRow[]>([]);
   const [selectedTechniques, setSelectedTechniques] = useState<TechniqueRow[]>([]);
+  const [selectedHardware, setSelectedHardware] = useState<HardwareRow[]>([]);
+  const [originalStatus, setOriginalStatus] = useState("");
 
   const [existingImages, setExistingImages] = useState<string[]>([]);
   const [imagesToRemove, setImagesToRemove] = useState<string[]>([]);
@@ -46,18 +52,21 @@ export default function EditWorkPage() {
   useEffect(() => {
     const supabase = createClient();
     async function load() {
-      const [c, t, tech, workRes, wtRes, wteRes] = await Promise.all([
+      const [c, t, tech, hw, workRes, wtRes, wteRes, whRes] = await Promise.all([
         supabase.from("clients").select("*").order("name"),
         supabase.from("threads").select("*").order("color_name"),
         supabase.from("techniques").select("*").order("name"),
+        supabase.from("hardware").select("*").order("name"),
         supabase.from("works").select("*").eq("id", params.id).single(),
         supabase.from("work_threads").select("*").eq("work_id", params.id),
         supabase.from("work_techniques").select("*").eq("work_id", params.id),
+        supabase.from("work_hardware").select("*").eq("work_id", params.id),
       ]);
 
       setClients(c.data ?? []);
       setThreads(t.data ?? []);
       setTechniques(tech.data ?? []);
+      setHardwareList(hw.data ?? []);
 
       if (workRes.data) {
         const w = workRes.data;
@@ -69,11 +78,13 @@ export default function EditWorkPage() {
           inspiration: w.inspiration ?? "",
           meaning: w.meaning ?? "",
           special_notes: w.special_notes ?? "",
+          memo: w.memo ?? "",
           flower_count: w.flower_count?.toString() ?? "",
           variation_count: w.variation_count?.toString() ?? "",
-          status: w.status ?? "completed",
+          status: w.status ?? "ideation",
         });
         setExistingImages(w.image_urls ?? []);
+        setOriginalStatus(w.status);
       }
 
       if (wtRes.data) {
@@ -92,6 +103,16 @@ export default function EditWorkPage() {
             technique_id: wt.technique_id,
             usage_count: wt.usage_count.toString(),
             notes: wt.notes ?? "",
+          }))
+        );
+      }
+
+      if (whRes.data) {
+        setSelectedHardware(
+          whRes.data.map((wh: { hardware_id: string; quantity: number; notes: string | null }) => ({
+            hardware_id: wh.hardware_id,
+            quantity: wh.quantity.toString(),
+            notes: wh.notes ?? "",
           }))
         );
       }
@@ -153,15 +174,25 @@ export default function EditWorkPage() {
 
       if (error) throw error;
 
-      // Replace work_threads and work_techniques
+      // Stock logic: only restore/deduct if work is in_progress or beyond
+      const isStockTracked = originalStatus === "in_progress" || originalStatus === "completed";
+      if (isStockTracked) {
+        await restoreThreadStock(params.id);
+        await restoreHardwareStock(params.id);
+      }
+
+      // Replace work_threads, work_techniques, work_hardware
       await Promise.all([
         supabase.from("work_threads").delete().eq("work_id", params.id),
         supabase.from("work_techniques").delete().eq("work_id", params.id),
+        supabase.from("work_hardware").delete().eq("work_id", params.id),
       ]);
 
+      const shouldDeductStock = isStockTracked || form.status === "in_progress";
       await Promise.all([
-        saveWorkThreads(params.id, selectedThreads),
+        saveWorkThreads(params.id, selectedThreads, shouldDeductStock),
         saveWorkTechniques(params.id, selectedTechniques),
+        saveWorkHardware(params.id, selectedHardware),
       ]);
 
       router.push(`/works/${params.id}`);
@@ -239,6 +270,8 @@ export default function EditWorkPage() {
           </div>
         </section>
 
+        <MemoSection form={form} setForm={setForm} />
+
         <ThreadsSection
           threads={threads}
           selectedThreads={selectedThreads}
@@ -248,6 +281,12 @@ export default function EditWorkPage() {
           newThread={newThread}
           setNewThread={setNewThread}
           onAddThread={handleAddThread}
+        />
+
+        <HardwareSection
+          hardware={hardwareList}
+          selectedHardware={selectedHardware}
+          setSelectedHardware={setSelectedHardware}
         />
 
         <TechniquesSection

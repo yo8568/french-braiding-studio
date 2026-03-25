@@ -28,27 +28,13 @@ export interface ClientNote {
 export interface Order {
   id: string;
   client_id: string;
-  shipping_method?: "delivery" | "convenience_store";
-  shipping_address?: string;
-  store_name?: string;
-  store_branch?: string;
-  total_amount?: number;
-  status: "pending" | "shipped" | "delivered" | "cancelled";
+  shipping_method?: string;
+  status: "preparing" | "pending" | "shipped" | "delivered";
   notes?: string;
   created_at: string;
   // joined
   client?: Client;
-  order_items?: OrderItem[];
-}
-
-export interface OrderItem {
-  id: string;
-  order_id: string;
-  work_id: string;
-  price: number;
-  quantity: number;
-  // joined
-  work?: Work;
+  works?: Work[];
 }
 
 export interface Work {
@@ -61,15 +47,46 @@ export interface Work {
   inspiration?: string;
   meaning?: string;
   special_notes?: string;
+  memo?: string;
+  order_id?: string;
   flower_count?: number;
   variation_count?: number;
-  status: "in_progress" | "completed" | "for_sale" | "sold";
+  status: "ideation" | "in_progress" | "completed" | "sold";
   created_at: string;
   updated_at: string;
   // joined
   client?: Client;
+  order?: Order;
   work_threads?: WorkThread[];
   work_techniques?: WorkTechnique[];
+  work_hardware?: WorkHardware[];
+}
+
+export interface Hardware {
+  id: string;
+  name: string;
+  description?: string;
+  price?: number;
+  stock_count?: number;
+  created_at: string;
+}
+
+export interface HardwarePurchase {
+  id: string;
+  hardware_id: string;
+  quantity: number;
+  price: number;
+  note?: string;
+  created_at: string;
+}
+
+export interface WorkHardware {
+  id: string;
+  work_id: string;
+  hardware_id: string;
+  quantity: number;
+  notes?: string;
+  hardware?: Hardware;
 }
 
 export interface Thread {
@@ -81,6 +98,15 @@ export interface Thread {
   source?: string;
   price?: number;
   stock_length_cm?: number;
+  created_at: string;
+}
+
+export interface ThreadPurchase {
+  id: string;
+  thread_id: string;
+  length_cm: number;
+  price: number;
+  note?: string;
   created_at: string;
 }
 

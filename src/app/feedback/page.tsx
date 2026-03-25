@@ -9,12 +9,14 @@ import {
   FEEDBACK_STATUS_LABELS,
   FEEDBACK_STATUS_COLORS,
 } from "@/lib/constants";
+import Pagination, { paginate } from "@/app/components/Pagination";
 
 export default function FeedbackPage() {
   const [allFeedback, setAllFeedback] = useState<Feedback[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState<"all" | "open" | "resolved">("all");
   const [filterCategory, setFilterCategory] = useState<string>("all");
+  const [page, setPage] = useState(1);
 
   const supabase = createClient();
 
@@ -77,7 +79,7 @@ export default function FeedbackPage() {
       <div className="flex flex-wrap gap-3 mb-6">
         <select
           value={filterStatus}
-          onChange={(e) => setFilterStatus(e.target.value as "all" | "open" | "resolved")}
+          onChange={(e) => { setFilterStatus(e.target.value as "all" | "open" | "resolved"); setPage(1); }}
           className="border border-border rounded-lg px-3 py-2 bg-card text-sm"
         >
           <option value="all">全部狀態</option>
@@ -86,7 +88,7 @@ export default function FeedbackPage() {
         </select>
         <select
           value={filterCategory}
-          onChange={(e) => setFilterCategory(e.target.value)}
+          onChange={(e) => { setFilterCategory(e.target.value); setPage(1); }}
           className="border border-border rounded-lg px-3 py-2 bg-card text-sm"
         >
           <option value="all">全部分類</option>
@@ -115,9 +117,11 @@ export default function FeedbackPage() {
         </div>
       ) : feedbackList.length === 0 ? (
         <p className="text-muted text-center py-12">目前沒有回饋資料</p>
-      ) : (
+      ) : (() => {
+        const { paged: pagedFeedback, totalPages } = paginate(feedbackList, page);
+        return (<>
         <div className="space-y-3">
-          {feedbackList.map((item) => (
+          {pagedFeedback.map((item) => (
             <div
               key={item.id}
               className={`border border-border rounded-xl p-4 bg-card transition-opacity ${
@@ -171,7 +175,9 @@ export default function FeedbackPage() {
             </div>
           ))}
         </div>
-      )}
+        <Pagination currentPage={page} totalPages={totalPages} onPageChange={setPage} />
+        </>);
+      })()}
     </div>
   );
 }

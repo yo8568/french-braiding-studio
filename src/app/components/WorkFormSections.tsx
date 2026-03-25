@@ -16,6 +16,7 @@ export interface WorkFormData {
   flower_count: string;
   variation_count: string;
   status: string;
+  memo: string;
 }
 
 export interface ThreadRow {
@@ -30,6 +31,12 @@ export interface TechniqueRow {
   notes: string;
 }
 
+export interface HardwareRow {
+  hardware_id: string;
+  quantity: string;
+  notes: string;
+}
+
 export const EMPTY_WORK_FORM: WorkFormData = {
   client_id: "",
   name: "",
@@ -40,7 +47,8 @@ export const EMPTY_WORK_FORM: WorkFormData = {
   special_notes: "",
   flower_count: "",
   variation_count: "",
-  status: "completed",
+  status: "ideation",
+  memo: "",
 };
 
 export const EMPTY_NEW_THREAD = {
@@ -175,11 +183,17 @@ export function BasicInfoSection({
           value={form.status}
           onChange={(e) => setForm({ ...form, status: e.target.value })}
         >
-          {Object.entries(WORK_STATUS_LABELS).map(([value, label]) => (
-            <option key={value} value={value}>
-              {label}
-            </option>
-          ))}
+          {Object.entries(WORK_STATUS_LABELS).map(([value, label]) => {
+            const statusOrder = ["ideation", "in_progress", "completed", "sold"];
+            const currentIndex = statusOrder.indexOf(form.status);
+            const optionIndex = statusOrder.indexOf(value);
+            const disabled = optionIndex < currentIndex;
+            return (
+              <option key={value} value={value} disabled={disabled}>
+                {label}
+              </option>
+            );
+          })}
         </select>
       </div>
 
@@ -518,6 +532,126 @@ export function DetailsSection({ form, setForm }: DetailsSectionProps) {
           placeholder="有什麼特別值得記錄的？"
         />
       </div>
+    </section>
+  );
+}
+
+// ----- Memo section -----
+
+interface MemoSectionProps {
+  form: WorkFormData;
+  setForm: (f: WorkFormData) => void;
+}
+
+export function MemoSection({ form, setForm }: MemoSectionProps) {
+  return (
+    <section className="bg-card border border-border rounded-xl p-6 space-y-4">
+      <h2 className="text-xl font-semibold text-primary">發想筆記</h2>
+      <div>
+        <label className="block text-sm font-medium mb-1">發想筆記</label>
+        <textarea
+          className={INPUT_CLASS}
+          rows={4}
+          value={form.memo}
+          onChange={(e) => setForm({ ...form, memo: e.target.value })}
+          placeholder="記錄設計靈感、構想..."
+        />
+      </div>
+    </section>
+  );
+}
+
+// ----- Hardware selection section -----
+
+interface Hardware {
+  id: string;
+  name: string;
+  description?: string;
+  price?: number;
+  stock_count?: number;
+  created_at: string;
+}
+
+interface HardwareSectionProps {
+  hardware: Hardware[];
+  selectedHardware: HardwareRow[];
+  setSelectedHardware: (rows: HardwareRow[]) => void;
+}
+
+export function HardwareSection({
+  hardware,
+  selectedHardware,
+  setSelectedHardware,
+}: HardwareSectionProps) {
+  return (
+    <section className="bg-card border border-border rounded-xl p-6 space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl font-semibold text-primary">使用五金</h2>
+        <button
+          type="button"
+          onClick={() =>
+            setSelectedHardware([
+              ...selectedHardware,
+              { hardware_id: "", quantity: "1", notes: "" },
+            ])
+          }
+          className="text-primary text-sm"
+        >
+          + 新增五金
+        </button>
+      </div>
+
+      {selectedHardware.map((sh, i) => (
+        <div key={i} className="flex gap-2 items-center">
+          <select
+            className={INPUT_CLASS}
+            value={sh.hardware_id}
+            onChange={(e) =>
+              setSelectedHardware(
+                updateRow(selectedHardware, i, { hardware_id: e.target.value })
+              )
+            }
+          >
+            <option value="">選擇五金</option>
+            {hardware.map((h) => (
+              <option key={h.id} value={h.id}>
+                {h.name}
+                {h.stock_count != null ? ` (庫存 ${h.stock_count})` : ""}
+              </option>
+            ))}
+          </select>
+          <input
+            type="number"
+            className="w-20 border border-border rounded-lg px-2 py-2 bg-card"
+            placeholder="數量"
+            value={sh.quantity}
+            onChange={(e) =>
+              setSelectedHardware(
+                updateRow(selectedHardware, i, { quantity: e.target.value })
+              )
+            }
+          />
+          <input
+            className="flex-1 border border-border rounded-lg px-2 py-2 bg-card"
+            placeholder="備註"
+            value={sh.notes}
+            onChange={(e) =>
+              setSelectedHardware(
+                updateRow(selectedHardware, i, { notes: e.target.value })
+              )
+            }
+          />
+          <button
+            type="button"
+            onClick={() =>
+              setSelectedHardware(selectedHardware.filter((_, j) => j !== i))
+            }
+            className="text-red-400 hover:text-red-600"
+          >
+            x
+          </button>
+        </div>
+      ))}
     </section>
   );
 }

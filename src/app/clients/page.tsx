@@ -13,6 +13,7 @@ import { uploadImages } from "@/lib/upload";
 import type { Client, ClientNote, Work } from "@/lib/types";
 import Modal from "@/app/components/Modal";
 import Lightbox from "@/app/components/Lightbox";
+import Pagination, { paginate } from "@/app/components/Pagination";
 
 export default function ClientsPage() {
   const supabase = createClient();
@@ -25,6 +26,7 @@ export default function ClientsPage() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [noteForm, setNoteForm] = useState<{ clientId: string; type: ClientNote["type"]; content: string; images: File[] } | null>(null);
   const [lightbox, setLightbox] = useState<{ images: string[]; index: number } | null>(null);
+  const [page, setPage] = useState(1);
   const [form, setForm] = useState({
     name: "",
     social_media_type: "ig" as "ig" | "line" | "fb",
@@ -247,9 +249,11 @@ export default function ClientsPage() {
       {/* Client list */}
       {clients.length === 0 ? (
         <div className="text-center py-16 text-muted">尚無客戶</div>
-      ) : (
+      ) : (() => {
+        const { paged: pagedClients, totalPages } = paginate(clients, page);
+        return (<>
         <div className="space-y-4">
-          {clients.map((client) => {
+          {pagedClients.map((client) => {
             const works = clientWorks[client.id] ?? [];
             const isExpanded = expandedId === client.id;
 
@@ -488,7 +492,9 @@ export default function ClientsPage() {
             );
           })}
         </div>
-      )}
+        <Pagination currentPage={page} totalPages={totalPages} onPageChange={setPage} />
+        </>);
+      })()}
 
       {lightbox && (
         <Lightbox

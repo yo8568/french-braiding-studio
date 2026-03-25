@@ -27,7 +27,9 @@ CREATE TABLE works (
   special_notes TEXT,
   flower_count INTEGER DEFAULT 0,
   variation_count INTEGER DEFAULT 0,
-  status TEXT DEFAULT 'completed' CHECK (status IN ('in_progress', 'completed', 'for_sale', 'sold')),
+  memo TEXT,
+  order_id UUID,
+  status TEXT DEFAULT 'ideation' CHECK (status IN ('ideation', 'in_progress', 'completed', 'sold')),
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
 );
@@ -45,6 +47,18 @@ CREATE TABLE threads (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
+-- 線材進貨紀錄
+CREATE TABLE thread_purchases (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  thread_id UUID REFERENCES threads(id) ON DELETE CASCADE,
+  length_cm DECIMAL(10, 2) NOT NULL,
+  price DECIMAL(10, 2) NOT NULL,
+  note TEXT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_thread_purchases_thread ON thread_purchases(thread_id);
+
 -- 作品用線（多對多）
 CREATE TABLE work_threads (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -54,6 +68,39 @@ CREATE TABLE work_threads (
   quantity INTEGER DEFAULT 1,
   notes TEXT
 );
+
+-- 五金
+CREATE TABLE hardware (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  name TEXT NOT NULL,
+  description TEXT,
+  price DECIMAL(10, 2),
+  stock_count INTEGER DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- 五金進貨紀錄
+CREATE TABLE hardware_purchases (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  hardware_id UUID REFERENCES hardware(id) ON DELETE CASCADE,
+  quantity INTEGER NOT NULL,
+  price DECIMAL(10, 2) NOT NULL,
+  note TEXT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_hardware_purchases_hardware ON hardware_purchases(hardware_id);
+
+-- 作品五金（多對多）
+CREATE TABLE work_hardware (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  work_id UUID REFERENCES works(id) ON DELETE CASCADE,
+  hardware_id UUID REFERENCES hardware(id) ON DELETE CASCADE,
+  quantity INTEGER DEFAULT 1,
+  notes TEXT
+);
+
+CREATE INDEX idx_work_hardware_work ON work_hardware(work_id);
 
 -- 編法
 CREATE TABLE techniques (
@@ -162,5 +209,13 @@ CREATE POLICY "Allow all" ON work_threads FOR ALL USING (true) WITH CHECK (true)
 CREATE POLICY "Allow all" ON techniques FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow all" ON work_techniques FOR ALL USING (true) WITH CHECK (true);
 CREATE POLICY "Allow all" ON cord_presets FOR ALL USING (true) WITH CHECK (true);
+ALTER TABLE thread_purchases ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all" ON thread_purchases FOR ALL USING (true) WITH CHECK (true);
+ALTER TABLE hardware ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all" ON hardware FOR ALL USING (true) WITH CHECK (true);
+ALTER TABLE work_hardware ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all" ON work_hardware FOR ALL USING (true) WITH CHECK (true);
+ALTER TABLE hardware_purchases ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all" ON hardware_purchases FOR ALL USING (true) WITH CHECK (true);
 ALTER TABLE feedback ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Allow all" ON feedback FOR ALL USING (true) WITH CHECK (true);

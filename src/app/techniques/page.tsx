@@ -6,11 +6,13 @@ import { createClient } from "@/lib/supabase";
 import { INPUT_CLASS } from "@/lib/constants";
 import type { Technique } from "@/lib/types";
 import Modal from "@/app/components/Modal";
+import Pagination, { paginate } from "@/app/components/Pagination";
 
 export default function TechniquesPage() {
   const supabase = createClient();
   const [techniques, setTechniques] = useState<Technique[]>([]);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState({
@@ -235,9 +237,11 @@ export default function TechniquesPage() {
       {/* List */}
       {techniques.length === 0 ? (
         <div className="text-center py-16 text-muted">尚無編法</div>
-      ) : (
+      ) : (() => {
+        const { paged: pagedTechniques, totalPages } = paginate(techniques, page);
+        return (<>
         <div className="space-y-3">
-          {techniques.map((t) => (
+          {pagedTechniques.map((t) => (
             <div
               key={t.id}
               className="bg-card border border-border rounded-xl p-4 flex items-center justify-between"
@@ -282,7 +286,9 @@ export default function TechniquesPage() {
             </div>
           ))}
         </div>
-      )}
+        <Pagination currentPage={page} totalPages={totalPages} onPageChange={setPage} />
+        </>);
+      })()}
     </div>
   );
 }

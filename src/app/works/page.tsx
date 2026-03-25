@@ -4,12 +4,14 @@ import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase";
 import { WORK_STATUS_LABELS } from "@/lib/constants";
 import type { Work } from "@/lib/types";
+import Pagination, { paginate } from "@/app/components/Pagination";
 
 const filterLabels: Record<string, string> = { all: "全部", ...WORK_STATUS_LABELS };
 
 export default function WorksPage() {
   const [works, setWorks] = useState<Work[]>([]);
   const [filter, setFilter] = useState<string>("all");
+  const [page, setPage] = useState(1);
 
   useEffect(() => {
     const supabase = createClient();
@@ -47,7 +49,7 @@ export default function WorksPage() {
         {Object.entries(filterLabels).map(([key, label]) => (
           <button
             key={key}
-            onClick={() => setFilter(key)}
+            onClick={() => { setFilter(key); setPage(1); }}
             className={`px-3 py-1 rounded-full text-sm transition-colors ${
               filter === key
                 ? "bg-primary text-white"
@@ -61,9 +63,11 @@ export default function WorksPage() {
 
       {works.length === 0 ? (
         <div className="text-center py-16 text-muted">暫無作品</div>
-      ) : (
+      ) : (() => {
+        const { paged, totalPages } = paginate(works, page);
+        return (<>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {works.map((work) => (
+          {paged.map((work) => (
             <a
               key={work.id}
               href={`/works/${work.id}`}
@@ -105,7 +109,9 @@ export default function WorksPage() {
             </a>
           ))}
         </div>
-      )}
+        <Pagination currentPage={page} totalPages={totalPages} onPageChange={setPage} />
+        </>);
+      })()}
     </div>
   );
 }

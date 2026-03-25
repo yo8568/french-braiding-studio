@@ -2,27 +2,34 @@
 export const INPUT_CLASS =
   "w-full border border-border rounded-lg px-3 py-2 bg-card focus:outline-none focus:ring-2 focus:ring-primary/30";
 
-// Work status labels
+// Work status labels and colors
 export const WORK_STATUS_LABELS: Record<string, string> = {
+  ideation: "發想中",
   in_progress: "製作中",
   completed: "已完成",
-  for_sale: "販售中",
   sold: "已售出",
+};
+
+export const WORK_STATUS_COLORS: Record<string, string> = {
+  ideation: "bg-purple-100 text-purple-800",
+  in_progress: "bg-yellow-100 text-yellow-800",
+  completed: "bg-green-100 text-green-800",
+  sold: "bg-gray-100 text-gray-800",
 };
 
 // Order status labels and colors
 export const ORDER_STATUS_LABELS: Record<string, string> = {
+  preparing: "準備中",
   pending: "待出貨",
-  shipped: "已寄送",
+  shipped: "已寄貨",
   delivered: "已送達",
-  cancelled: "已取消",
 };
 
 export const ORDER_STATUS_COLORS: Record<string, string> = {
+  preparing: "bg-purple-100 text-purple-800",
   pending: "bg-yellow-100 text-yellow-800",
   shipped: "bg-blue-100 text-blue-800",
   delivered: "bg-green-100 text-green-800",
-  cancelled: "bg-red-100 text-red-800",
 };
 
 // Shipping labels
