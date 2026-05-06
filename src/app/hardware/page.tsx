@@ -137,12 +137,20 @@ export default function HardwarePage() {
     <div className="max-w-4xl mx-auto">
       <div className="flex items-center justify-between mb-8">
         <h1 className="text-3xl font-bold">五金管理</h1>
-        <button
-          onClick={() => { resetForm(); setShowForm(true); }}
-          className="bg-primary text-white px-4 py-2 rounded-lg hover:bg-accent transition-colors"
-        >
-          + 新增五金
-        </button>
+        <div className="flex gap-2">
+          <a
+            href="/hardware/inventory"
+            className="border border-primary text-primary px-4 py-2 rounded-lg hover:bg-primary/10 transition-colors"
+          >
+            盤點
+          </a>
+          <button
+            onClick={() => { resetForm(); setShowForm(true); }}
+            className="bg-primary text-white px-4 py-2 rounded-lg hover:bg-accent transition-colors"
+          >
+            + 新增五金
+          </button>
+        </div>
       </div>
 
       <div className="mb-6">

@@ -239,6 +239,12 @@ export default function ThreadsPage() {
       <div className="flex items-center justify-between mb-8">
         <h1 className="text-3xl font-bold">線材管理</h1>
         <div className="flex gap-2">
+          <a
+            href="/threads/inventory"
+            className="border border-primary text-primary px-4 py-2 rounded-lg hover:bg-primary/10 transition-colors"
+          >
+            盤點
+          </a>
           <button
             onClick={() => {
               setShowCsvUpload(!showCsvUpload);

@@ -152,6 +152,32 @@ export interface Feedback {
   resolved_at?: string;
 }
 
+export interface HardwareInventoryCount {
+  id: string;
+  hardware_id: string;
+  expected_count: number;
+  actual_count: number;
+  diff: number;
+  note?: string;
+  applied: boolean;
+  counted_at: string;
+  created_at: string;
+  hardware?: Hardware;
+}
+
+export interface ThreadInventoryCount {
+  id: string;
+  thread_id: string;
+  expected_length_cm: number;
+  actual_length_cm: number;
+  diff_cm: number;
+  note?: string;
+  applied: boolean;
+  counted_at: string;
+  created_at: string;
+  thread?: Thread;
+}
+
 export interface CordCalculation {
   knot_type: string;
   finished_length_cm: number;
